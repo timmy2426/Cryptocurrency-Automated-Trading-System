@@ -6,6 +6,7 @@ from typing import Optional, Union, List, Callable
 import logging
 from datetime import datetime
 import os
+import yaml
 from dotenv import load_dotenv
 
 # 加載環境變量
@@ -37,20 +38,34 @@ class BinanceAPI:
         '1M': Client.KLINE_INTERVAL_1MONTH
     }
     
-    def __init__(self, testnet: bool = False):
+    def __init__(self):
         """
         初始化 Binance API
-        
-        Args:
-            testnet: 是否使用測試網
         """
-        api_key = os.getenv('BINANCE_TESTNET_API_KEY' if testnet else 'BINANCE_API_KEY')
-        api_secret = os.getenv('BINANCE_TESTNET_API_SECRET' if testnet else 'BINANCE_API_SECRET')
+        # 讀取設置文件
+        with open('config/settings.yaml', 'r', encoding='utf-8') as f:
+            self.settings = yaml.safe_load(f)
+            
+        # 根據設置決定是否使用測試網
+        self.testnet = self.settings['control']['testnet']
         
-        self.client = Client(api_key, api_secret, testnet=testnet)
+        # 獲取 API 密鑰
+        api_key = os.getenv('BINANCE_TESTNET_API_KEY' if self.testnet else 'BINANCE_API_KEY')
+        api_secret = os.getenv('BINANCE_TESTNET_API_SECRET' if self.testnet else 'BINANCE_API_SECRET')
+        
+        # 初始化客戶端
+        self.client = Client(api_key, api_secret, testnet=self.testnet)
+        
+        # 設置 API 端點
+        if self.testnet:
+            self.client.API_URL = self.settings['binance_api']['testnet_rest_api_url']
+            
+        # 初始化 WebSocket 管理器
         self.bm = BinanceSocketManager(self.client)
         self.conn_key = None
         self.callback = None
+        
+        logger.info(f"已初始化 Binance API，使用{'測試網' if self.testnet else '主網'}")
         
     def start_kline_socket(self, 
                           symbol: str, 
@@ -101,7 +116,7 @@ class BinanceAPI:
             self.conn_key = self.bm.start_kline_socket(symbol, self.KLINE_INTERVALS[interval], process_message)
             self.callback = callback
             self.bm.start()
-            logger.info(f"已啟動 {symbol} {interval} K 線 WebSocket")
+            logger.info(f"已啟動 {symbol} {interval} K 線 WebSocket（{'測試網' if self.testnet else '主網'}）")
             
         except Exception as e:
             logger.error(f"啟動 K 線 WebSocket 失敗: {str(e)}")
@@ -173,6 +188,7 @@ class BinanceAPI:
             # 設置時間戳為索引
             df.set_index('timestamp', inplace=True)
             
+            logger.info(f"已獲取 {symbol} {interval} 歷史 K 線數據（{'測試網' if self.testnet else '主網'}）")
             return df
             
         except BinanceAPIException as e:
