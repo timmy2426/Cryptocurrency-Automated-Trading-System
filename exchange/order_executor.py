@@ -1,10 +1,11 @@
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
 import logging
-from typing import Optional, List
+from typing import Optional, List, Dict, Union
 from enum import Enum
 from dataclasses import dataclass
 import yaml
+import os
 
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
@@ -293,4 +294,148 @@ class OrderExecutor:
             
         except Exception as e:
             logger.error(f"平倉失敗: {str(e)}")
+            raise
+
+    def get_order_status(self, symbol: str, order_id: Optional[int] = None, 
+                        client_order_id: Optional[str] = None) -> OrderResult:
+        """
+        查詢訂單狀態
+        
+        Args:
+            symbol: 交易對
+            order_id: 訂單ID
+            client_order_id: 客戶訂單ID
+            
+        Returns:
+            OrderResult: 訂單結果
+        """
+        try:
+            if order_id:
+                order = self.client.futures_get_order(symbol=symbol, orderId=order_id)
+            elif client_order_id:
+                order = self.client.futures_get_order(symbol=symbol, origClientOrderId=client_order_id)
+            else:
+                raise ValueError("必須提供 order_id 或 client_order_id")
+                
+            return OrderResult(
+                order_id=order['orderId'],
+                client_order_id=order['clientOrderId'],
+                symbol=order['symbol'],
+                side=OrderSide[order['side']],
+                position_side=PositionSide[order['positionSide']],
+                type=OrderType[order['type']],
+                status=OrderStatus[order['status']],
+                quantity=float(order['origQty']),
+                price=float(order['price']) if order['price'] else None,
+                stop_price=float(order['stopPrice']) if order['stopPrice'] else None,
+                reduce_only=order['reduceOnly'],
+                close_position=order['closePosition'],
+                activate_price=float(order['activationPrice']) if order['activationPrice'] else None,
+                price_rate=float(order['priceRate']) if order['priceRate'] else None,
+                update_time=order['updateTime']
+            )
+            
+        except Exception as e:
+            logger.error(f"查詢訂單狀態失敗: {str(e)}")
+            raise
+            
+    def cancel_order(self, symbol: str, order_id: Optional[int] = None, 
+                    client_order_id: Optional[str] = None) -> OrderResult:
+        """
+        取消訂單
+        
+        Args:
+            symbol: 交易對
+            order_id: 訂單ID
+            client_order_id: 客戶訂單ID
+            
+        Returns:
+            OrderResult: 訂單結果
+        """
+        try:
+            if order_id:
+                order = self.client.futures_cancel_order(symbol=symbol, orderId=order_id)
+            elif client_order_id:
+                order = self.client.futures_cancel_order(symbol=symbol, origClientOrderId=client_order_id)
+            else:
+                raise ValueError("必須提供 order_id 或 client_order_id")
+                
+            return OrderResult(
+                order_id=order['orderId'],
+                client_order_id=order['clientOrderId'],
+                symbol=order['symbol'],
+                side=OrderSide[order['side']],
+                position_side=PositionSide[order['positionSide']],
+                type=OrderType[order['type']],
+                status=OrderStatus[order['status']],
+                quantity=float(order['origQty']),
+                price=float(order['price']) if order['price'] else None,
+                stop_price=float(order['stopPrice']) if order['stopPrice'] else None,
+                reduce_only=order['reduceOnly'],
+                close_position=order['closePosition'],
+                activate_price=float(order['activationPrice']) if order['activationPrice'] else None,
+                price_rate=float(order['priceRate']) if order['priceRate'] else None,
+                update_time=order['updateTime']
+            )
+            
+        except Exception as e:
+            logger.error(f"取消訂單失敗: {str(e)}")
+            raise
+            
+    def close_all_positions(self) -> List[OrderResult]:
+        """
+        全部平倉
+        
+        Returns:
+            List[OrderResult]: 平倉訂單結果列表
+        """
+        try:
+            # 獲取所有倉位
+            positions = self.client.futures_position_information()
+            
+            # 過濾出有倉位的交易對
+            positions = [p for p in positions if float(p['positionAmt']) != 0]
+            
+            results = []
+            for position in positions:
+                symbol = position['symbol']
+                position_amt = float(position['positionAmt'])
+                
+                # 根據倉位方向決定平倉方向
+                if position_amt > 0:
+                    side = OrderSide.SELL
+                else:
+                    side = OrderSide.BUY
+                    
+                # 市價平倉
+                order = self.client.futures_create_order(
+                    symbol=symbol,
+                    side=side,
+                    type=OrderType.MARKET.value,
+                    quantity=abs(position_amt),
+                    reduceOnly=True
+                )
+                
+                results.append(OrderResult(
+                    order_id=order['orderId'],
+                    client_order_id=order['clientOrderId'],
+                    symbol=order['symbol'],
+                    side=OrderSide[order['side']],
+                    position_side=PositionSide[order['positionSide']],
+                    type=OrderType[order['type']],
+                    status=OrderStatus[order['status']],
+                    quantity=float(order['origQty']),
+                    price=None,
+                    stop_price=None,
+                    reduce_only=True,
+                    close_position=False,
+                    activate_price=None,
+                    price_rate=None,
+                    update_time=order['updateTime']
+                ))
+                
+            return results
+            
+        except Exception as e:
+            logger.error(f"全部平倉失敗: {str(e)}")
             raise

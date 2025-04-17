@@ -31,6 +31,7 @@ symbol_list: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT','XRPUSDT', 'ADAUSDT']
 risk_control:
   risk_per_trade: 0.02
   max_margin_usage: 0.7
+  slippage_percent: 0.005
   max_holding_bars: 6
   max_daily_trades: 10
   max_daily_loss: 0.1

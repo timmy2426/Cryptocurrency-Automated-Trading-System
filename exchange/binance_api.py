@@ -15,6 +15,8 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from websocket import create_connection, WebSocketApp
 from dotenv import load_dotenv
 from enum import Enum
+from dataclasses import dataclass
+from decimal import Decimal
 
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
@@ -24,6 +26,47 @@ class OrderSide(Enum):
     """訂單方向枚舉"""
     BUY = "BUY"
     SELL = "SELL"
+
+class PositionStatus(Enum):
+    """倉位狀態枚舉"""
+    OPEN = "OPEN"  # 開倉
+    CLOSE = "CLOSE"  # 平倉
+
+class CloseReason(Enum):
+    """平倉原因枚舉"""
+    STOP_LOSS = "STOP_LOSS"  # 止損
+    TAKE_PROFIT = "TAKE_PROFIT"  # 止盈
+    TRAILING_STOP = "TRAILING_STOP"  # 移動止損
+    LIQUIDATION = "LIQUIDATION"  # 爆倉
+    MANUAL = "MANUAL"  # 手動平倉
+
+@dataclass
+class PositionInfo:
+    """倉位信息數據類"""
+    status: PositionStatus  # 倉位狀態
+    symbol: str  # 交易對
+    leverage: int  # 槓桿
+    size: float  # 倉位大小
+    margin: float  # 保證金
+    entry_price: float  # 開倉價格
+    stop_loss: Optional[float]  # 止損價格
+    take_profit: Optional[float]  # 止盈價格
+    close_reason: Optional[CloseReason]  # 平倉原因
+    close_price: Optional[float]  # 平倉價格
+    pnl_usdt: Optional[float]  # 盈虧金額(USDT)
+    pnl_percent: Optional[float]  # 盈虧比率(%)
+
+@dataclass
+class AccountInfo:
+    """賬戶信息數據類"""
+    total_wallet_balance: float
+    total_unrealized_profit: float
+    total_margin_balance: float
+    available_balance: float
+    max_withdraw_amount: float
+    assets: List[Dict]
+    positions: List[PositionInfo]
+    update_time: int
 
 class BinanceAPI:
     """Binance API 封裝類"""
@@ -378,4 +421,222 @@ class BinanceAPI:
             raise
         except Exception as e:
             logger.error(f"發生未知錯誤: {str(e)}")
+            raise
+
+    def start_position_listener(self, callback: Callable[[PositionInfo], None]) -> None:
+        """
+        啟動倉位監聽器
+        
+        Args:
+            callback: 回調函數，接收 PositionInfo 對象
+        """
+        try:
+            # 生成監聽 key
+            self.position_listen_key = self.client.futures_stream_get_listen_key()
+            
+            # 設置 WebSocket 端點
+            ws_endpoint = f"{self.settings['binance_api']['webSocket_base_endpoint_for_testnet' if self.testnet else 'webSocket_base_endpoint']}/ws/{self.position_listen_key}"
+            
+            # 創建 WebSocket 連接
+            self.position_ws = WebSocketApp(
+                ws_endpoint,
+                on_message=lambda ws, msg: self._on_position_message(ws, msg, callback),
+                on_error=self._on_position_error,
+                on_close=self._on_position_close,
+                on_open=self._on_position_open
+            )
+            
+            # 啟動 WebSocket 連接
+            self.position_ws.run_forever()
+            
+            logger.info("倉位監聽器已啟動")
+            
+        except Exception as e:
+            logger.error(f"啟動倉位監聽器失敗: {str(e)}")
+            raise
+            
+    def stop_position_listener(self) -> None:
+        """停止倉位監聽器"""
+        try:
+            if self.position_ws:
+                self.position_ws.close()
+                self.position_ws = None
+                logger.info("倉位監聽器已停止")
+        except Exception as e:
+            logger.error(f"停止倉位監聽器失敗: {str(e)}")
+            raise
+            
+    def _on_position_message(self, ws, message, callback):
+        """處理倉位消息"""
+        try:
+            data = json.loads(message)
+            
+            # 處理 ping 消息
+            if 'ping' in data:
+                pong = {'pong': data['ping']}
+                ws.send(json.dumps(pong))
+                return
+                
+            # 處理倉位更新
+            if data['e'] == 'ACCOUNT_UPDATE':
+                for position in data['a']['P']:
+                    # 檢查倉位是否為 0（平倉）
+                    if float(position['pa']) == 0:
+                        # 獲取平倉原因
+                        close_reason = self._get_close_reason(position)
+                        
+                        # 創建 PositionInfo 對象
+                        position_info = PositionInfo(
+                            status=PositionStatus.CLOSE,
+                            symbol=position['s'],
+                            leverage=int(position['l']),
+                            size=float(position['pa']),
+                            margin=float(position['m']),
+                            entry_price=float(position['ep']),
+                            stop_loss=float(position['sl']) if position['sl'] else None,
+                            take_profit=float(position['tp']) if position['tp'] else None,
+                            close_reason=close_reason,
+                            close_price=float(position['cp']),
+                            pnl_usdt=float(position['rp']),
+                            pnl_percent=float(position['cr'])
+                        )
+                    else:
+                        # 開倉或更新倉位
+                        position_info = PositionInfo(
+                            status=PositionStatus.OPEN,
+                            symbol=position['s'],
+                            leverage=int(position['l']),
+                            size=float(position['pa']),
+                            margin=float(position['m']),
+                            entry_price=float(position['ep']),
+                            stop_loss=float(position['sl']) if position['sl'] else None,
+                            take_profit=float(position['tp']) if position['tp'] else None,
+                            close_reason=None,
+                            close_price=None,
+                            pnl_usdt=None,
+                            pnl_percent=None
+                        )
+                    
+                    # 調用回調函數
+                    callback(position_info)
+                    
+        except Exception as e:
+            logger.error(f"處理倉位消息時發生錯誤: {str(e)}")
+            
+    def _get_close_reason(self, position: Dict) -> CloseReason:
+        """獲取平倉原因"""
+        try:
+            # 檢查是否為爆倉
+            if position.get('lq', 0) > 0:
+                return CloseReason.LIQUIDATION
+                
+            # 檢查是否為止損
+            if position.get('sl', 0) > 0 and float(position['cp']) <= float(position['sl']):
+                return CloseReason.STOP_LOSS
+                
+            # 檢查是否為止盈
+            if position.get('tp', 0) > 0 and float(position['cp']) >= float(position['tp']):
+                return CloseReason.TAKE_PROFIT
+                
+            # 檢查是否為移動止損
+            if position.get('ts', 0) > 0:
+                return CloseReason.TRAILING_STOP
+                
+            # 默認為手動平倉
+            return CloseReason.MANUAL
+            
+        except Exception as e:
+            logger.error(f"獲取平倉原因時發生錯誤: {str(e)}")
+            return CloseReason.MANUAL
+            
+    def _on_position_error(self, ws, error):
+        """處理倉位監聽器錯誤"""
+        logger.error(f"倉位監聽器錯誤: {str(error)}")
+        
+    def _on_position_close(self, ws, close_status_code, close_msg):
+        """處理倉位監聽器關閉"""
+        logger.info("倉位監聽器連接已關閉")
+        
+    def _on_position_open(self, ws):
+        """處理倉位監聽器打開"""
+        logger.info("倉位監聽器連接已建立")
+
+    def get_position_info(self, symbol: Optional[str] = None) -> Union[PositionInfo, List[PositionInfo]]:
+        """
+        獲取倉位信息
+        
+        Args:
+            symbol: 交易對，如果為 None 則返回所有倉位
+            
+        Returns:
+            Union[PositionInfo, List[PositionInfo]]: 倉位信息
+        """
+        try:
+            positions = self.client.futures_position_information(symbol=symbol)
+            
+            if symbol:
+                position = positions[0]
+                return PositionInfo(
+                    status=PositionStatus.OPEN if float(position['positionAmt']) > 0 else PositionStatus.CLOSE,
+                    symbol=position['symbol'],
+                    leverage=int(position['leverage']),
+                    size=float(position['positionAmt']),
+                    margin=float(position['marginBalance']),
+                    entry_price=float(position['entryPrice']),
+                    stop_loss=float(position['sl']) if position['sl'] else None,
+                    take_profit=float(position['tp']) if position['tp'] else None,
+                    close_reason=None,
+                    close_price=float(position['cp']) if float(position['positionAmt']) != 0 else None,
+                    pnl_usdt=float(position['unRealizedProfit']) if float(position['positionAmt']) > 0 else None,
+                    pnl_percent=float(position['cr']) if float(position['positionAmt']) > 0 else None
+                )
+            else:
+                return [
+                    PositionInfo(
+                        status=PositionStatus.OPEN if float(p['positionAmt']) > 0 else PositionStatus.CLOSE,
+                        symbol=p['symbol'],
+                        leverage=int(p['leverage']),
+                        size=float(p['positionAmt']),
+                        margin=float(p['marginBalance']),
+                        entry_price=float(p['entryPrice']),
+                        stop_loss=float(p['sl']) if p['sl'] else None,
+                        take_profit=float(p['tp']) if p['tp'] else None,
+                        close_reason=None,
+                        close_price=float(p['cp']) if float(p['positionAmt']) != 0 else None,
+                        pnl_usdt=float(p['unRealizedProfit']) if float(p['positionAmt']) > 0 else None,
+                        pnl_percent=float(p['cr']) if float(p['positionAmt']) > 0 else None
+                    )
+                    for p in positions
+                ]
+                
+        except Exception as e:
+            logger.error(f"獲取倉位信息失敗: {str(e)}")
+            raise
+            
+    def get_account_info(self) -> AccountInfo:
+        """
+        獲取賬戶信息
+        
+        Returns:
+            AccountInfo: 賬戶信息
+        """
+        try:
+            account = self.client.futures_account()
+            
+            # 獲取所有倉位信息
+            positions = self.get_position_info()
+            
+            return AccountInfo(
+                total_wallet_balance=float(account['totalWalletBalance']),
+                total_unrealized_profit=float(account['totalUnrealizedProfit']),
+                total_margin_balance=float(account['totalMarginBalance']),
+                available_balance=float(account['availableBalance']),
+                max_withdraw_amount=float(account['maxWithdrawAmount']),
+                assets=account['assets'],
+                positions=positions,
+                update_time=int(account['updateTime'])
+            )
+            
+        except Exception as e:
+            logger.error(f"獲取賬戶信息失敗: {str(e)}")
             raise
