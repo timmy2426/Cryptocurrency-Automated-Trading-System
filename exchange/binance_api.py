@@ -1,9 +1,15 @@
 from binance.client import Client
+from binance.websockets import BinanceSocketManager
 from binance.exceptions import BinanceAPIException
 import pandas as pd
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Callable
 import logging
 from datetime import datetime
+import os
+from dotenv import load_dotenv
+
+# 加載環境變量
+load_dotenv()
 
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
@@ -31,24 +37,97 @@ class BinanceAPI:
         '1M': Client.KLINE_INTERVAL_1MONTH
     }
     
-    def __init__(self, api_key: Optional[str] = None, api_secret: Optional[str] = None):
+    def __init__(self, testnet: bool = False):
         """
         初始化 Binance API
         
         Args:
-            api_key: Binance API 密鑰
-            api_secret: Binance API 密鑰
+            testnet: 是否使用測試網
         """
-        self.client = Client(api_key, api_secret)
+        api_key = os.getenv('BINANCE_TESTNET_API_KEY' if testnet else 'BINANCE_API_KEY')
+        api_secret = os.getenv('BINANCE_TESTNET_API_SECRET' if testnet else 'BINANCE_API_SECRET')
         
-    def get_klines(self, 
-                  symbol: str, 
-                  interval: str, 
-                  limit: int = 500,
-                  start_time: Optional[Union[int, str, datetime]] = None,
-                  end_time: Optional[Union[int, str, datetime]] = None) -> pd.DataFrame:
+        self.client = Client(api_key, api_secret, testnet=testnet)
+        self.bm = BinanceSocketManager(self.client)
+        self.conn_key = None
+        self.callback = None
+        
+    def start_kline_socket(self, 
+                          symbol: str, 
+                          interval: str, 
+                          callback: Callable[[pd.DataFrame], None]) -> None:
         """
-        獲取 K 線數據
+        啟動 K 線 WebSocket
+        
+        Args:
+            symbol: 交易對，例如 'BTCUSDT'
+            interval: K線時間週期，例如 '1m', '1h', '1d'
+            callback: 回調函數，接收 DataFrame 格式的 K 線數據
+        """
+        try:
+            # 驗證時間週期
+            if interval not in self.KLINE_INTERVALS:
+                raise ValueError(f"無效的時間週期: {interval}。可用的週期: {list(self.KLINE_INTERVALS.keys())}")
+            
+            def process_message(msg):
+                """處理 WebSocket 消息"""
+                try:
+                    if msg['e'] == 'error':
+                        logger.error(f"WebSocket 錯誤: {msg['m']}")
+                        return
+                        
+                    kline = msg['k']
+                    df = pd.DataFrame([{
+                        'timestamp': pd.to_datetime(kline['t'], unit='ms'),
+                        'open': float(kline['o']),
+                        'high': float(kline['h']),
+                        'low': float(kline['l']),
+                        'close': float(kline['c']),
+                        'volume': float(kline['v']),
+                        'close_time': pd.to_datetime(kline['T'], unit='ms'),
+                        'quote_asset_volume': float(kline['q']),
+                        'number_of_trades': int(kline['n']),
+                        'taker_buy_base_asset_volume': float(kline['V']),
+                        'taker_buy_quote_asset_volume': float(kline['Q']),
+                        'is_final': kline['x']
+                    }])
+                    df.set_index('timestamp', inplace=True)
+                    callback(df)
+                    
+                except Exception as e:
+                    logger.error(f"處理 K 線數據時發生錯誤: {str(e)}")
+            
+            # 啟動 WebSocket
+            self.conn_key = self.bm.start_kline_socket(symbol, self.KLINE_INTERVALS[interval], process_message)
+            self.callback = callback
+            self.bm.start()
+            logger.info(f"已啟動 {symbol} {interval} K 線 WebSocket")
+            
+        except Exception as e:
+            logger.error(f"啟動 K 線 WebSocket 失敗: {str(e)}")
+            raise
+            
+    def stop_kline_socket(self) -> None:
+        """停止 K 線 WebSocket"""
+        try:
+            if self.conn_key:
+                self.bm.stop_socket(self.conn_key)
+                self.bm.close()
+                self.conn_key = None
+                self.callback = None
+                logger.info("已停止 K 線 WebSocket")
+        except Exception as e:
+            logger.error(f"停止 K 線 WebSocket 失敗: {str(e)}")
+            raise
+            
+    def get_historical_klines(self,
+                            symbol: str,
+                            interval: str,
+                            limit: int = 500,
+                            start_time: Optional[Union[int, str, datetime]] = None,
+                            end_time: Optional[Union[int, str, datetime]] = None) -> pd.DataFrame:
+        """
+        獲取歷史 K 線數據（使用 REST API）
         
         Args:
             symbol: 交易對，例如 'BTCUSDT'
@@ -59,10 +138,6 @@ class BinanceAPI:
             
         Returns:
             pd.DataFrame: 包含 K 線數據的 DataFrame
-            
-        Raises:
-            ValueError: 當參數無效時
-            BinanceAPIException: 當 API 調用失敗時
         """
         try:
             # 驗證時間週期
@@ -75,7 +150,7 @@ class BinanceAPI:
                 limit = 1000
                 
             # 獲取 K 線數據
-            klines = self.client.get_klines(
+            klines = self.client.get_historical_klines(
                 symbol=symbol,
                 interval=self.KLINE_INTERVALS[interval],
                 limit=limit,
@@ -101,7 +176,7 @@ class BinanceAPI:
             return df
             
         except BinanceAPIException as e:
-            logger.error(f"獲取 K 線數據失敗: {str(e)}")
+            logger.error(f"獲取歷史 K 線數據失敗: {str(e)}")
             raise
         except Exception as e:
             logger.error(f"發生未知錯誤: {str(e)}")
