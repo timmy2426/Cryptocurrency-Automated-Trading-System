@@ -1,3 +1,6 @@
+control:
+  testnet: true
+
 binance_api:
   base_endpoint: https://fapi.binance.com
   testnet_rest_api_url: https://testnet.binancefuture.com
@@ -5,6 +8,8 @@ binance_api:
   webSocket_base_endpoint_for_testnet: wss://testnet.binancefuture.com/ws-fapi/v1
   max_weight_per_minute: 1200
   max_order_per_second: 10
+  ping_interval: 180  # 3分鐘
+  pong_timeout: 600   # 10分鐘
   max_order_per_minute: 100
 
 index:
