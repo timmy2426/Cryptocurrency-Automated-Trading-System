@@ -2,7 +2,7 @@ from binance.client import Client
 from binance.websockets import BinanceSocketManager
 from binance.exceptions import BinanceAPIException
 import pandas as pd
-from typing import Optional, Union, List, Callable, Dict
+from typing import Optional, Union, List, Callable, Dict, Tuple
 import logging
 from datetime import datetime
 import os
@@ -14,10 +14,16 @@ import base64
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from websocket import create_connection, WebSocketApp
 from dotenv import load_dotenv
+from enum import Enum
 
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+class OrderSide(Enum):
+    """訂單方向枚舉"""
+    BUY = "BUY"
+    SELL = "SELL"
 
 class BinanceAPI:
     """Binance API 封裝類"""
@@ -39,6 +45,17 @@ class BinanceAPI:
         '3d': Client.KLINE_INTERVAL_3DAY,
         '1w': Client.KLINE_INTERVAL_1WEEK,
         '1M': Client.KLINE_INTERVAL_1MONTH
+    }
+    
+    # 訂單簿限制映射
+    ORDERBOOK_LIMITS = {
+        5: 2,
+        10: 2,
+        20: 2,
+        50: 2,
+        100: 5,
+        500: 10,
+        1000: 20
     }
     
     def __init__(self):
@@ -293,3 +310,72 @@ class BinanceAPI:
             List[str]: 可用的時間週期列表
         """
         return list(self.KLINE_INTERVALS.keys())
+
+    def get_order_book(self, 
+                      symbol: str, 
+                      side: OrderSide, 
+                      quantity: float, 
+                      limit: int = 100) -> Tuple[float, float]:
+        """
+        獲取訂單簿信息
+        
+        Args:
+            symbol: 交易對，例如 'BTCUSDT'
+            side: 訂單方向，OrderSide.BUY 或 OrderSide.SELL
+            quantity: 需要的數量
+            limit: 訂單簿深度，可選值：[5, 10, 20, 50, 100, 500, 1000]，默認 100
+            
+        Returns:
+            Tuple[float, float]: (平均價格, 可成交數量)
+            
+        Raises:
+            ValueError: 當參數無效時
+            BinanceAPIException: 當 API 調用失敗時
+        """
+        try:
+            # 驗證 limit 參數
+            if limit not in self.ORDERBOOK_LIMITS:
+                raise ValueError(f"無效的訂單簿深度: {limit}。可用的深度: {list(self.ORDERBOOK_LIMITS.keys())}")
+            
+            # 獲取訂單簿
+            depth = self.client.futures_order_book(symbol=symbol, limit=limit)
+            
+            # 根據方向選擇訂單簿
+            orders = depth['bids'] if side == OrderSide.BUY else depth['asks']
+            
+            # 計算可成交的數量和平均價格
+            total_quantity = 0.0
+            total_value = 0.0
+            
+            for price, qty in orders:
+                price = float(price)
+                qty = float(qty)
+                
+                if total_quantity + qty >= quantity:
+                    # 最後一部分
+                    remaining = quantity - total_quantity
+                    total_value += remaining * price
+                    total_quantity = quantity
+                    break
+                else:
+                    # 全部成交
+                    total_value += qty * price
+                    total_quantity += qty
+            
+            if total_quantity == 0:
+                logger.warning(f"訂單簿中沒有足夠的流動性來滿足 {quantity} {symbol} 的 {side.value} 訂單")
+                return 0.0, 0.0
+                
+            average_price = total_value / total_quantity
+            
+            logger.info(f"訂單簿分析完成: {symbol} {side.value} {quantity}")
+            logger.info(f"平均價格: {average_price}, 可成交數量: {total_quantity}")
+            
+            return average_price, total_quantity
+            
+        except BinanceAPIException as e:
+            logger.error(f"獲取訂單簿失敗: {str(e)}")
+            raise
+        except Exception as e:
+            logger.error(f"發生未知錯誤: {str(e)}")
+            raise
