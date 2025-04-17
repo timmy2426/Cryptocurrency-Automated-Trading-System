@@ -9,9 +9,6 @@ import os
 import yaml
 from dotenv import load_dotenv
 
-# 加載環境變量
-load_dotenv()
-
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,6 +39,9 @@ class BinanceAPI:
         """
         初始化 Binance API
         """
+        # 加載環境變量
+        load_dotenv(dotenv_path='config/api_keys.env')
+        
         # 讀取設置文件
         with open('config/settings.yaml', 'r', encoding='utf-8') as f:
             self.settings = yaml.safe_load(f)
@@ -52,6 +52,9 @@ class BinanceAPI:
         # 獲取 API 密鑰
         api_key = os.getenv('BINANCE_TESTNET_API_KEY' if self.testnet else 'BINANCE_API_KEY')
         api_secret = os.getenv('BINANCE_TESTNET_API_SECRET' if self.testnet else 'BINANCE_API_SECRET')
+        
+        if not api_key or not api_secret:
+            raise ValueError(f"未找到{'測試網' if self.testnet else '主網'} API 密鑰，請檢查 config/api_keys.env 文件")
         
         # 初始化客戶端
         self.client = Client(api_key, api_secret, testnet=self.testnet)
