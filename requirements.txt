@@ -1,7 +1,7 @@
-python-binance==1.0.19
-pandas==1.5.3
-numpy==1.24.3
-ta==0.10.2
+binance-connector==3.5.0
 python-dotenv==1.0.0
+pandas==2.0.3
+pyyaml==6.0.1
+ta==0.10.2
 discord-webhook==1.2.0
 schedule==1.2.0 

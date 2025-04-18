@@ -1,16 +1,19 @@
 control:
   testnet: true
+  debug: true
 
 binance_api:
   base_endpoint: https://fapi.binance.com
   testnet_rest_api_url: https://testnet.binancefuture.com
-  webSocket_base_endpoint: wss://ws-fapi.binance.com/ws-fapi/v1
-  webSocket_base_endpoint_for_testnet: wss://testnet.binancefuture.com/ws-fapi/v1
+  webSocket_base_endpoint: wss://fstream.binance.com
+  webSocket_base_endpoint_for_testnet: wss://stream.binancefuture.com
   max_weight_per_minute: 1200
-  max_order_per_second: 10
-  ping_interval: 180  
-  pong_timeout: 600   
+  max_order_per_second: 50
+  ping_interval: 60
+  pong_timeout: 20
+  reconnect_attempts: 5
   max_order_per_minute: 100
+  recv_window: 5000
 
 index:
   bb_length: 20
@@ -19,14 +22,19 @@ index:
   ma_slow_length: 100
   atr_period: 14
 
-trade:
-symbol_list: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT','XRPUSDT', 'ADAUSDT']
+trading:
+  symbol_list:
+    - BTCUSDT
+    - ETHUSDT
+    - SOLUSDT
+    - XRPUSDT
+    - ADAUSDT
   leverage: 5
+  price_protect: true
   trailing_percent: 0.012
   max_loss_percent: 0.012
   mean_reversion_tp: 0.018
   mean_reversion_sl: 0.01
-  confirm_candle: 1
 
 risk_control:
   risk_per_trade: 0.02
@@ -37,4 +45,4 @@ risk_control:
   max_daily_loss: 0.1
   cooldown_period: 3600
   exit_ratio_list: [0.5, 0.3, 0.2]
-
+  confirm_candle: 1
