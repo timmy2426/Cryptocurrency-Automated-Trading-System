@@ -32,8 +32,11 @@ def check_config_parameters(required_params: List[str]) -> Dict[str, Any]:
                     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config')
                 ]
                 
+                # 檢查所有必要的配置文件
                 for path in possible_paths:
-                    if os.path.exists(os.path.join(path, 'api_keys.env')):
+                    env_path = os.path.join(path, 'api_keys.env')
+                    config_path = os.path.join(path, 'settings.yaml')
+                    if os.path.exists(env_path) and os.path.exists(config_path):
                         config_dir = path
                         break
                         
@@ -42,15 +45,10 @@ def check_config_parameters(required_params: List[str]) -> Dict[str, Any]:
                     
             # 加載環境變量
             env_path = os.path.join(config_dir, 'api_keys.env')
-            if not os.path.exists(env_path):
-                raise FileNotFoundError(f"找不到配置文件: {env_path}")
             load_dotenv(dotenv_path=env_path)
             
             # 加載設置文件
             config_path = os.path.join(config_dir, 'settings.yaml')
-            if not os.path.exists(config_path):
-                raise FileNotFoundError(f"找不到配置文件: {config_path}")
-                
             with open(config_path, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)
                 

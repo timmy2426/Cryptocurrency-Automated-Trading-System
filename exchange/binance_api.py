@@ -16,6 +16,7 @@ import ssl
 
 from .enums import OrderSide, PositionStatus, CloseReason, OrderType, OrderStatus, WorkingType, TimeInForce, PriceMatch, SelfTradePreventionMode, PositionSide
 from .data_models import PositionInfo, AccountInfo, Order, OrderResult
+from .converter import BinanceConverter
 from core import check_config_parameters
 
 # 設置日誌
@@ -325,37 +326,23 @@ class BinanceAPI:
     def _handle_user_message(self, msg: Dict):
         """處理用戶數據流消息"""
         try:
+            # 確保 msg 是字典類型
+            if not isinstance(msg, dict):
+                logger.error(f"收到非字典類型的消息: {msg}")
+                return
+                
             event_type = msg.get('e')
             
             if event_type == 'ACCOUNT_UPDATE':
                 # 處理帳戶更新事件
                 positions = msg.get('a', {}).get('P', [])
                 for position in positions:
-                    if position:
-                        position_info = PositionInfo(
-                            symbol=position.get('s', ''),
-                            position_amt=Decimal(str(position.get('pa', 0))),
-                            entry_price=Decimal(str(position.get('ep', 0))),
-                            mark_price=Decimal(str(position.get('mp', 0))),
-                            un_realized_profit=Decimal(str(position.get('up', 0))),
-                            liquidation_price=Decimal(str(position.get('lp', 0))),
-                            leverage=int(position.get('l', 1)),
-                            max_notional_value=Decimal(str(position.get('mnv', 0))),
-                            margin_type=position.get('mt', 'isolated'),
-                            isolated_margin=Decimal(str(position.get('im', 0))),
-                            is_auto_add_margin=position.get('iam', False),
-                            status=PositionStatus.OPEN if float(position.get('pa', 0)) != 0 else PositionStatus.CLOSED,
-                            stop_loss=float(position.get('sl', 0)) if position.get('sl') else None,
-                            take_profit=float(position.get('tp', 0)) if position.get('tp') else None,
-                            close_reason=self._get_close_reason(position),
-                            close_price=float(position.get('cp', 0)) if position.get('cp') else None,
-                            pnl_usdt=float(position.get('up', 0)),
-                            pnl_percent=float(position.get('cr', 0)),
-                            position_balance=Decimal(str(position.get('pb', 0))),
-                            margin_ratio=Decimal(str(position.get('mr', 0))) if position.get('mr') else None,
-                            margin_ratio_level=position.get('mrl', ''),
-                            update_time=datetime.fromtimestamp(position.get('t', 0) / 1000)
-                        )
+                    if position and isinstance(position, dict):
+                        # 使用 BinanceConverter 轉換倉位數據
+                        position_info = BinanceConverter.to_position({
+                            'e': 'ACCOUNT_UPDATE',
+                            'a': {'P': [position]}
+                        })
                         
                         # 調用回調函數
                         if self.position_callback:
@@ -364,14 +351,21 @@ class BinanceAPI:
             elif event_type == 'ORDER_TRADE_UPDATE':
                 # 處理訂單交易更新事件
                 order = msg.get('o', {})
-                if order:
-                    logger.info(f"訂單更新: {order}")
-                    # 這裡可以添加訂單狀態變更的處理邏輯
+                if order and isinstance(order, dict):
+                    try:
+                        # 使用 BinanceConverter 轉換訂單數據
+                        order_info = BinanceConverter.to_order({
+                            'e': 'ORDER_TRADE_UPDATE',
+                            'o': order
+                        })
+                        logger.info(f"訂單更新: {order_info}")
+                    except Exception as e:
+                        logger.error(f"轉換訂單數據失敗: {str(e)}")
                     
             elif event_type == 'TRADE_LITE':
                 # 處理簡化交易事件
                 trade = msg.get('o', {})
-                if trade:
+                if trade and isinstance(trade, dict):
                     logger.info(f"簡化交易更新: {trade}")
                     # 這裡可以添加交易更新的處理邏輯
                     
@@ -379,13 +373,14 @@ class BinanceAPI:
                 # 處理保證金通知事件
                 positions = msg.get('p', [])
                 for position in positions:
-                    logger.warning(f"保證金通知: {position}")
-                    # 這裡可以添加保證金通知的處理邏輯
+                    if position and isinstance(position, dict):
+                        logger.warning(f"保證金通知: {position}")
+                        # 這裡可以添加保證金通知的處理邏輯
                     
             elif event_type == 'ACCOUNT_CONFIG_UPDATE':
                 # 處理帳戶配置更新事件
                 config = msg.get('ac', {})
-                if config:
+                if config and isinstance(config, dict):
                     logger.info(f"帳戶配置更新: {config}")
                     # 這裡可以添加帳戶配置更新的處理邏輯
                     
@@ -771,38 +766,156 @@ class BinanceAPI:
             logger.error(f"修改槓桿倍數失敗: {str(e)}")
             raise
 
-    def _convert_to_order_result(self, response: Dict) -> OrderResult:
-        """將 Binance API 返回的訂單數據轉換為 OrderResult 對象
+    def get_all_orders(self, symbol: Optional[str] = None, limit: int = 500) -> List[Order]:
+        """查詢所有訂單（只返回未完全成交的訂單）
         
         Args:
-            response: Binance API 返回的訂單數據
+            symbol: 交易對，如果為 None 則查詢 symbol_list 中的所有交易對
+            limit: 返回的訂單數量限制
             
         Returns:
-            OrderResult: 轉換後的 OrderResult 對象
+            List[Order]: 訂單列表
         """
         try:
-            return OrderResult(
-                symbol=response['symbol'],
-                side=OrderSide[response['side']],
-                type=OrderType[response['type']],
-                quantity=Decimal(str(response['origQty'])),
-                transact_time=response.get('time', response['updateTime']),
-                time_in_force=TimeInForce[response['timeInForce']],
-                order_id=response['orderId'],
-                client_order_id=response['clientOrderId'],
-                price=Decimal(str(response['price'])) if response['price'] != '0' else None,
-                orig_qty=Decimal(str(response['origQty'])),
-                executed_qty=Decimal(str(response['executedQty'])),
-                cummulative_quote_qty=Decimal(str(response['cumQuote'])),
-                status=OrderStatus[response['status']],
-                iceberg_qty=Decimal(str(response.get('icebergQty', '0'))) if response.get('icebergQty') else None,
-                time=response.get('time', response['updateTime']),
-                update_time=response['updateTime'],
-                is_working=response.get('isWorking', False),
-                orig_quote_order_qty=Decimal(str(response.get('origQuoteOrderQty', '0'))) if response.get('origQuoteOrderQty') else None
-            )
+            if symbol:
+                # 檢查交易對是否在 symbol_list 中
+                if symbol not in self.symbol_list:
+                    raise ValueError(f"交易對 {symbol} 不在配置的 symbol_list 中")
+                    
+                # 查詢指定交易對的訂單
+                orders = self.client.get_orders(symbol=symbol, limit=limit)
+                # 只返回未完全成交的訂單
+                return [BinanceConverter.to_order(order) for order in orders 
+                       if order['status'] in ['NEW', 'PARTIALLY_FILLED']]
+            else:
+                # 查詢 symbol_list 中的所有交易對的訂單
+                all_orders = []
+                for symbol in self.symbol_list:
+                    try:
+                        orders = self.client.get_orders(symbol=symbol, limit=limit)
+                        # 只返回未完全成交的訂單
+                        unfilled_orders = [BinanceConverter.to_order(order) for order in orders 
+                                         if order['status'] in ['NEW', 'PARTIALLY_FILLED']]
+                        all_orders.extend(unfilled_orders)
+                    except Exception as e:
+                        logger.error(f"查詢 {symbol} 訂單失敗: {str(e)}")
+                        continue
+                return all_orders
         except Exception as e:
-            logger.error(f"轉換訂單結果失敗: {str(e)}")
+            logger.error(f"查詢訂單失敗: {str(e)}")
+            raise
+
+    def cancel_order(self, symbol: str, order_id: Optional[int] = None, 
+                    client_order_id: Optional[str] = None) -> Order:
+        """取消訂單
+        
+        Args:
+            symbol: 交易對
+            order_id: 訂單ID
+            client_order_id: 客戶訂單ID
+            
+        Returns:
+            Order: 被取消的訂單
+        """
+        try:
+            params = {'symbol': symbol}
+            if order_id:
+                params['orderId'] = order_id
+            if client_order_id:
+                params['origClientOrderId'] = client_order_id
+                
+            response = self.client.cancel_order(**params)
+            logger.info(f"取消訂單成功: {response}")
+            
+            # 使用 BinanceConverter 轉換訂單結果
+            return BinanceConverter.to_order(response)
+            
+        except Exception as e:
+            logger.error(f"取消訂單失敗: {str(e)}")
+            raise
+
+    def cancel_all_orders(self, symbol: Optional[str] = None) -> List[Order]:
+        """取消所有訂單"""
+        try:
+            if symbol:
+                if symbol not in self.symbol_list:
+                    raise ValueError(f"交易對 {symbol} 不在配置的 symbol_list 中")
+                    
+                # 先獲取當前未完成的訂單
+                open_orders = self.client.get_orders(symbol=symbol, limit=100)
+                orders_to_cancel = [order for order in open_orders 
+                                  if order['status'] in ['NEW', 'PARTIALLY_FILLED']]
+                
+                if not orders_to_cancel:
+                    logger.info(f"沒有找到 {symbol} 的未完成訂單")
+                    return []
+                    
+                # 執行取消操作
+                response = self.client.cancel_open_orders(symbol=symbol)
+                logger.info(f"取消訂單響應: {response}")
+                
+                if not response or response.get('code') != 200:
+                    logger.warning(f"取消 {symbol} 訂單失敗: {response}")
+                    return []
+                    
+                # 返回被取消的訂單信息
+                return [BinanceConverter.to_order(order) for order in orders_to_cancel]
+            else:
+                # 取消所有交易對的訂單
+                cancelled_orders = []
+                for symbol in self.symbol_list:
+                    try:
+                        # 先獲取當前未完成的訂單
+                        open_orders = self.client.get_orders(symbol=symbol, limit=100)
+                        orders_to_cancel = [order for order in open_orders 
+                                          if order['status'] in ['NEW', 'PARTIALLY_FILLED']]
+                        
+                        if not orders_to_cancel:
+                            continue
+                            
+                        # 執行取消操作
+                        response = self.client.cancel_open_orders(symbol=symbol)
+                        logger.info(f"取消 {symbol} 訂單響應: {response}")
+                        
+                        if response and response.get('code') == 200:
+                            # 返回被取消的訂單信息
+                            cancelled_orders.extend([BinanceConverter.to_order(order) 
+                                                  for order in orders_to_cancel])
+                    except Exception as e:
+                        logger.error(f"取消 {symbol} 所有訂單失敗: {str(e)}")
+                        continue
+                return cancelled_orders
+        except Exception as e:
+            logger.error(f"取消所有訂單失敗: {str(e)}")
+            raise
+
+    def get_order_status(self, symbol: str, order_id: Optional[int] = None, client_order_id: Optional[str] = None) -> OrderResult:
+        """
+        查詢訂單信息
+        
+        Args:
+            symbol: 交易對
+            order_id: 訂單ID
+            client_order_id: 客戶訂單ID
+            
+        Returns:
+            OrderResult: 訂單結果對象
+        """
+        try:
+            params = {'symbol': symbol}
+            if order_id:
+                params['orderId'] = order_id
+            if client_order_id:
+                params['origClientOrderId'] = client_order_id
+                
+            response = self.client.query_order(**params)
+            logger.info(f"查詢訂單成功: {response}")
+            
+            # 使用 BinanceConverter 轉換訂單結果
+            return BinanceConverter.to_order_result(response)
+            
+        except Exception as e:
+            logger.error(f"查詢訂單失敗: {str(e)}")
             raise
 
     def new_order(self, **params) -> OrderResult:
@@ -879,42 +992,12 @@ class BinanceAPI:
             # 下單
             response = self.client.new_order(**params)
             
-            # 使用公共方法轉換訂單結果
-            return self._convert_to_order_result(response)
+            # 使用 BinanceConverter 轉換訂單結果
+            return BinanceConverter.to_order_result(response)
             
         except Exception as e:
             logger.error(f"下單失敗: {str(e)}")
             raise
-
-    def get_order_status(self, symbol: str, order_id: Optional[int] = None, client_order_id: Optional[str] = None) -> OrderResult:
-        """
-        查詢訂單信息
-        
-        Args:
-            symbol: 交易對
-            order_id: 訂單ID
-            client_order_id: 客戶訂單ID
-            
-        Returns:
-            OrderResult: 訂單結果對象
-        """
-        try:
-            params = {'symbol': symbol}
-            if order_id:
-                params['orderId'] = order_id
-            if client_order_id:
-                params['origClientOrderId'] = client_order_id
-                
-            response = self.client.query_order(**params)
-            logger.info(f"查詢訂單成功: {response}")
-            
-            # 使用公共方法轉換訂單結果
-            return self._convert_to_order_result(response)
-            
-        except Exception as e:
-            logger.error(f"查詢訂單失敗: {str(e)}")
-            raise
-
     def close(self):
         """關閉 API 連接"""
         try:
@@ -938,213 +1021,4 @@ class BinanceAPI:
                 logger.info("ListenKey 保活任務已停止")
         except Exception as e:
             logger.error(f"關閉 API 連接時發生錯誤: {str(e)}")
-            raise
-
-    def _convert_to_order(self, order_data: Dict) -> Order:
-        """將 Binance API 返回的訂單數據轉換為 Order 對象
-        
-        Args:
-            order_data: Binance API 返回的訂單數據，可以是 REST API 或 WebSocket 格式
-            
-        Returns:
-            Order: 轉換後的 Order 對象
-        """
-        try:
-            # 處理 WebSocket 訂單更新事件的數據格式
-            if 'o' in order_data:
-                order_data = order_data['o']
-                
-            # 判斷數據格式並提取字段
-            if 'symbol' in order_data:  # REST API 格式
-                symbol = order_data['symbol']
-                side = order_data['side']
-                type_ = order_data['type']
-                quantity = order_data['origQty']
-                price = order_data['price']
-                stop_price = order_data.get('stopPrice')
-                time_in_force = order_data.get('timeInForce')
-                reduce_only = order_data.get('reduceOnly', False)
-                close_position = order_data.get('closePosition', False)
-                working_type = order_data.get('workingType')
-                price_protect = order_data.get('priceProtect', False)
-                client_order_id = order_data.get('clientOrderId')
-                order_id = order_data['orderId']
-                orig_qty = order_data['origQty']
-                executed_qty = order_data['executedQty']
-                cummulative_quote_qty = order_data['cumQuote']
-                status = order_data['status']
-                time = order_data.get('time')
-                update_time = order_data.get('updateTime')
-                position_side = order_data.get('positionSide')
-                price_match = order_data.get('priceMatch')
-                self_trade_prevention_mode = order_data.get('selfTradePreventionMode')
-                good_till_date = order_data.get('goodTillDate')
-                activate_price = order_data.get('activatePrice')
-                price_rate = order_data.get('priceRate')
-                orig_type = order_data.get('origType')
-                avg_price = order_data.get('avgPrice')
-            else:  # WebSocket 格式
-                symbol = order_data['s']
-                side = order_data['S']
-                type_ = order_data['o']
-                quantity = order_data['q']
-                price = order_data['p']
-                stop_price = order_data.get('sp')
-                time_in_force = order_data.get('f')
-                reduce_only = order_data.get('R', False)
-                close_position = order_data.get('cp', False)
-                working_type = order_data.get('wt')
-                price_protect = order_data.get('pP', False)
-                client_order_id = order_data.get('c')
-                order_id = order_data['i']
-                orig_qty = order_data['q']
-                executed_qty = order_data['z']
-                cummulative_quote_qty = order_data.get('Z', '0')
-                status = order_data['X']
-                time = order_data.get('T')
-                update_time = order_data.get('T')
-                position_side = order_data.get('ps')
-                price_match = order_data.get('pm')
-                self_trade_prevention_mode = order_data.get('V')
-                good_till_date = order_data.get('gtd')
-                activate_price = order_data.get('ap')
-                price_rate = order_data.get('rp')
-                orig_type = order_data.get('ot')
-                avg_price = order_data.get('ap')
-                
-            return Order(
-                symbol=symbol,
-                side=OrderSide[side],
-                type=OrderType[type_],
-                quantity=Decimal(str(quantity)),
-                price=Decimal(str(price)) if price != '0' else None,
-                stop_price=Decimal(str(stop_price)) if stop_price and type_ != 'TRAILING_STOP_MARKET' else None,
-                time_in_force=TimeInForce[time_in_force] if time_in_force else None,
-                reduce_only=reduce_only,
-                close_position=close_position,
-                working_type=WorkingType[working_type] if working_type else None,
-                price_protect=price_protect,
-                new_client_order_id=client_order_id,
-                order_id=order_id,
-                client_order_id=client_order_id,
-                orig_qty=Decimal(str(orig_qty)),
-                executed_qty=Decimal(str(executed_qty)),
-                cummulative_quote_qty=Decimal(str(cummulative_quote_qty)),
-                status=OrderStatus[status],
-                time=time,
-                update_time=update_time,
-                is_working=status in ['NEW', 'PARTIALLY_FILLED'],
-                position_side=PositionSide[position_side] if position_side else None,
-                price_match=PriceMatch[price_match] if price_match else None,
-                self_trade_prevention_mode=SelfTradePreventionMode[self_trade_prevention_mode] if self_trade_prevention_mode else None,
-                good_till_date=good_till_date,
-                activate_price=Decimal(str(activate_price)) if activate_price else None,
-                price_rate=Decimal(str(price_rate)) if price_rate else None,
-                orig_type=OrderType[orig_type] if orig_type else None,
-                avg_price=Decimal(str(avg_price)) if avg_price else None
-            )
-        except Exception as e:
-            logger.error(f"轉換訂單數據失敗: {str(e)}")
-            raise
-
-    def get_all_orders(self, symbol: Optional[str] = None, limit: int = 500) -> List[Order]:
-        """查詢所有訂單（只返回未完全成交的訂單）
-        
-        Args:
-            symbol: 交易對，如果為 None 則查詢 symbol_list 中的所有交易對
-            limit: 返回的訂單數量限制
-            
-        Returns:
-            List[Order]: 訂單列表
-        """
-        try:
-            if symbol:
-                # 檢查交易對是否在 symbol_list 中
-                if symbol not in self.symbol_list:
-                    raise ValueError(f"交易對 {symbol} 不在配置的 symbol_list 中")
-                    
-                # 查詢指定交易對的訂單
-                orders = self.client.get_orders(symbol=symbol, limit=limit)
-                # 只返回未完全成交的訂單
-                return [self._convert_to_order(order) for order in orders 
-                       if order['status'] in ['NEW', 'PARTIALLY_FILLED']]
-            else:
-                # 查詢 symbol_list 中的所有交易對的訂單
-                all_orders = []
-                for symbol in self.symbol_list:
-                    try:
-                        orders = self.client.get_orders(symbol=symbol, limit=limit)
-                        # 只返回未完全成交的訂單
-                        unfilled_orders = [self._convert_to_order(order) for order in orders 
-                                         if order['status'] in ['NEW', 'PARTIALLY_FILLED']]
-                        all_orders.extend(unfilled_orders)
-                    except Exception as e:
-                        logger.error(f"查詢 {symbol} 訂單失敗: {str(e)}")
-                        continue
-                return all_orders
-        except Exception as e:
-            logger.error(f"查詢訂單失敗: {str(e)}")
-            raise
-
-    def cancel_order(self, symbol: str, order_id: Optional[int] = None, 
-                    client_order_id: Optional[str] = None) -> Order:
-        """取消訂單
-        
-        Args:
-            symbol: 交易對
-            order_id: 訂單ID
-            client_order_id: 客戶訂單ID
-            
-        Returns:
-            Order: 被取消的訂單
-        """
-        try:
-            params = {'symbol': symbol}
-            if order_id:
-                params['orderId'] = order_id
-            if client_order_id:
-                params['origClientOrderId'] = client_order_id
-                
-            response = self.client.cancel_order(**params)
-            logger.info(f"取消訂單成功: {response}")
-            
-            # 使用公共方法轉換訂單結果
-            return self._convert_to_order(response)
-            
-        except Exception as e:
-            logger.error(f"取消訂單失敗: {str(e)}")
-            raise
-
-    def cancel_all_orders(self, symbol: Optional[str] = None) -> List[Order]:
-        """取消所有訂單（只取消未完全成交的訂單）
-        
-        Args:
-            symbol: 交易對，如果為 None 則取消 symbol_list 中的所有交易對的訂單
-            
-        Returns:
-            List[Order]: 被取消的訂單列表
-        """
-        try:
-            if symbol:
-                # 檢查交易對是否在 symbol_list 中
-                if symbol not in self.symbol_list:
-                    raise ValueError(f"交易對 {symbol} 不在配置的 symbol_list 中")
-                    
-                # 取消指定交易對的所有訂單
-                response = self.client.cancel_open_orders(symbol=symbol)
-                return [self._convert_to_order(order) for order in response]
-            else:
-                # 取消 symbol_list 中所有交易對的訂單
-                cancelled_orders = []
-                for symbol in self.symbol_list:
-                    try:
-                        response = self.client.cancel_open_orders(symbol=symbol)
-                        cancelled_orders.extend([self._convert_to_order(order) for order in response])
-                    except Exception as e:
-                        logger.error(f"取消 {symbol} 所有訂單失敗: {str(e)}")
-                        continue
-                return cancelled_orders
-                
-        except Exception as e:
-            logger.error(f"取消所有訂單失敗: {str(e)}")
             raise

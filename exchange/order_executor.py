@@ -8,6 +8,7 @@ from datetime import datetime
 from .enums import OrderSide, OrderType, OrderStatus, TimeInForce, PositionStatus, CloseReason, WorkingType
 from .data_models import OrderResult, PositionInfo, Order, AccountInfo
 from .binance_api import BinanceAPI
+from .converter import BinanceConverter
 from core import check_config_parameters
 
 logger = logging.getLogger(__name__)
@@ -230,38 +231,8 @@ class OrderExecutor:
                 time_in_force=order.time_in_force
             )
             
-            # 構建訂單結果
-            result = OrderResult(
-                symbol=order_info.symbol,
-                side=order_info.side,
-                type=order_info.type,
-                quantity=order_info.quantity,
-                transact_time=order_info.transact_time,
-                time_in_force=order_info.time_in_force,
-                order_id=order_info.order_id,
-                client_order_id=order_info.client_order_id,
-                price=order_info.price,
-                orig_qty=order_info.orig_qty,
-                executed_qty=order_info.executed_qty,
-                cummulative_quote_qty=order_info.cummulative_quote_qty,
-                status=order_info.status,
-                iceberg_qty=order_info.iceberg_qty,
-                time=order_info.time,
-                update_time=order_info.update_time,
-                is_working=order_info.is_working,
-                orig_quote_order_qty=order_info.orig_quote_order_qty,
-                stop_price=order_info.stop_price,
-                working_type=order_info.working_type,
-                price_protect=order_info.price_protect,
-                reduce_only=order_info.reduce_only,
-                close_position=order_info.close_position,
-                position_side=order_info.position_side,
-                price_match=order_info.price_match,
-                self_trade_prevention_mode=order_info.self_trade_prevention_mode,
-                good_till_date=order_info.good_till_date
-            )
-            
-            return result
+            # 使用轉換器構建訂單結果
+            return BinanceConverter.to_order_result(order_info)
             
         except Exception as e:
             logger.error(f"開市價倉位發生錯誤: {str(e)}")
@@ -294,29 +265,8 @@ class OrderExecutor:
             # 下單
             order_info = self.api.new_order(**order_params)
             
-            # 構建訂單結果
-            result = OrderResult(
-                symbol=order.symbol,
-                side=order.side,
-                type=order.type,
-                quantity=order.quantity,
-                transact_time=order_info['transactTime'],
-                time_in_force=TimeInForce[order_info['timeInForce']],
-                order_id=order_info['orderId'],
-                client_order_id=order_info['clientOrderId'],
-                price=Decimal(str(order_info['price'])) if order_info['price'] != '0' else None,
-                orig_qty=Decimal(str(order_info['origQty'])),
-                executed_qty=Decimal(str(order_info['executedQty'])),
-                cummulative_quote_qty=Decimal(str(order_info['cummulativeQuoteQty'])),
-                status=OrderStatus[order_info['status']],
-                iceberg_qty=Decimal(str(order_info['icebergQty'])) if order_info['icebergQty'] else None,
-                time=order_info['time'],
-                update_time=order_info['updateTime'],
-                is_working=order_info['isWorking'],
-                orig_quote_order_qty=Decimal(str(order_info['origQuoteOrderQty'])) if order_info['origQuoteOrderQty'] else None
-            )
-            
-            return result
+            # 使用轉換器構建訂單結果
+            return BinanceConverter.to_order_result(order_info)
             
         except ClientError as e:
             logger.error(f"開止盈倉位失敗: {str(e)}")
@@ -352,29 +302,8 @@ class OrderExecutor:
             # 下單
             order_info = self.api.new_order(**order_params)
             
-            # 構建訂單結果
-            result = OrderResult(
-                symbol=order.symbol,
-                side=order.side,
-                type=order.type,
-                quantity=order.quantity,
-                transact_time=order_info['transactTime'],
-                time_in_force=TimeInForce[order_info['timeInForce']],
-                order_id=order_info['orderId'],
-                client_order_id=order_info['clientOrderId'],
-                price=Decimal(str(order_info['price'])) if order_info['price'] != '0' else None,
-                orig_qty=Decimal(str(order_info['origQty'])),
-                executed_qty=Decimal(str(order_info['executedQty'])),
-                cummulative_quote_qty=Decimal(str(order_info['cummulativeQuoteQty'])),
-                status=OrderStatus[order_info['status']],
-                iceberg_qty=Decimal(str(order_info['icebergQty'])) if order_info['icebergQty'] else None,
-                time=order_info['time'],
-                update_time=order_info['updateTime'],
-                is_working=order_info['isWorking'],
-                orig_quote_order_qty=Decimal(str(order_info['origQuoteOrderQty'])) if order_info['origQuoteOrderQty'] else None
-            )
-            
-            return result
+            # 使用轉換器構建訂單結果
+            return BinanceConverter.to_order_result(order_info)
             
         except ClientError as e:
             logger.error(f"開止損倉位失敗: {str(e)}")
@@ -411,29 +340,8 @@ class OrderExecutor:
             # 下單
             order_info = self.api.new_order(**order_params)
             
-            # 構建訂單結果
-            result = OrderResult(
-                symbol=order.symbol,
-                side=order.side,
-                type=order.type,
-                quantity=order.quantity,
-                transact_time=order_info['transactTime'],
-                time_in_force=TimeInForce[order_info['timeInForce']],
-                order_id=order_info['orderId'],
-                client_order_id=order_info['clientOrderId'],
-                price=Decimal(str(order_info['price'])) if order_info['price'] != '0' else None,
-                orig_qty=Decimal(str(order_info['origQty'])),
-                executed_qty=Decimal(str(order_info['executedQty'])),
-                cummulative_quote_qty=Decimal(str(order_info['cummulativeQuoteQty'])),
-                status=OrderStatus[order_info['status']],
-                iceberg_qty=Decimal(str(order_info['icebergQty'])) if order_info['icebergQty'] else None,
-                time=order_info['time'],
-                update_time=order_info['updateTime'],
-                is_working=order_info['isWorking'],
-                orig_quote_order_qty=Decimal(str(order_info['origQuoteOrderQty'])) if order_info['origQuoteOrderQty'] else None
-            )
-            
-            return result
+            # 使用轉換器構建訂單結果
+            return BinanceConverter.to_order_result(order_info)
             
         except ClientError as e:
             logger.error(f"開追蹤止損倉位失敗: {str(e)}")
@@ -455,7 +363,7 @@ class OrderExecutor:
         """取消訂單"""
         return self.api.cancel_order(symbol, order_id, client_order_id)
         
-    def cancel_all_orders(self, symbol: str) -> List[Order]:
+    def cancel_all_orders(self, symbol: Optional[str] = None) -> List[Order]:
         """取消所有訂單"""
         return self.api.cancel_all_orders(symbol)
         
@@ -489,29 +397,8 @@ class OrderExecutor:
                         reduceOnly=order.reduce_only
                     )
                     
-                    # 構建訂單結果
-                    result = OrderResult(
-                        symbol=order.symbol,
-                        side=order.side,
-                        type=order.type,
-                        quantity=order.quantity,
-                        transact_time=order_info['transactTime'],
-                        time_in_force=TimeInForce[order_info['timeInForce']],
-                        order_id=order_info['orderId'],
-                        client_order_id=order_info['clientOrderId'],
-                        price=Decimal(str(order_info['price'])) if order_info['price'] != '0' else None,
-                        orig_qty=Decimal(str(order_info['origQty'])),
-                        executed_qty=Decimal(str(order_info['executedQty'])),
-                        cummulative_quote_qty=Decimal(str(order_info['cummulativeQuoteQty'])),
-                        status=OrderStatus[order_info['status']],
-                        iceberg_qty=Decimal(str(order_info['icebergQty'])) if order_info['icebergQty'] else None,
-                        time=order_info['time'],
-                        update_time=order_info['updateTime'],
-                        is_working=order_info['isWorking'],
-                        orig_quote_order_qty=Decimal(str(order_info['origQuoteOrderQty'])) if order_info['origQuoteOrderQty'] else None
-                    )
-                    
-                    return result
+                    # 使用轉換器構建訂單結果
+                    return BinanceConverter.to_order_result(order_info)
                     
                 except ClientError as e:
                     if attempt < max_retries - 1:
@@ -556,28 +443,8 @@ class OrderExecutor:
                             reduceOnly=order.reduce_only
                         )
                         
-                        # 構建訂單結果
-                        result = OrderResult(
-                            symbol=order.symbol,
-                            side=order.side,
-                            type=order.type,
-                            quantity=order.quantity,
-                            transact_time=order_info['transactTime'],
-                            time_in_force=TimeInForce[order_info['timeInForce']],
-                            order_id=order_info['orderId'],
-                            client_order_id=order_info['clientOrderId'],
-                            price=Decimal(str(order_info['price'])) if order_info['price'] != '0' else None,
-                            orig_qty=Decimal(str(order_info['origQty'])),
-                            executed_qty=Decimal(str(order_info['executedQty'])),
-                            cummulative_quote_qty=Decimal(str(order_info['cummulativeQuoteQty'])),
-                            status=OrderStatus[order_info['status']],
-                            iceberg_qty=Decimal(str(order_info['icebergQty'])) if order_info['icebergQty'] else None,
-                            time=order_info['time'],
-                            update_time=order_info['updateTime'],
-                            is_working=order_info['isWorking'],
-                            orig_quote_order_qty=Decimal(str(order_info['origQuoteOrderQty'])) if order_info['origQuoteOrderQty'] else None
-                        )
-                        
+                        # 使用轉換器構建訂單結果
+                        result = BinanceConverter.to_order_result(order_info)
                         results.append(result)
                         logger.info(f"平倉成功: {position['symbol']}")
                         
@@ -603,37 +470,14 @@ class OrderExecutor:
                 if Decimal(response['positionAmt']) == 0:
                     return None
                     
-                return PositionInfo(
-                    symbol=response['symbol'],
-                    position_amt=Decimal(response['positionAmt']),
-                    entry_price=Decimal(response['entryPrice']),
-                    mark_price=Decimal(response['markPrice']),
-                    un_realized_profit=Decimal(response['unRealizedProfit']),
-                    liquidation_price=Decimal(response['liquidationPrice']),
-                    leverage=int(response['leverage']),
-                    max_notional_value=Decimal(response['maxNotionalValue']),
-                    margin_type=response['marginType'],
-                    isolated_margin=Decimal(response['isolatedMargin']),
-                    is_auto_add_margin=response['isAutoAddMargin']
-                )
+                # 使用轉換器構建倉位信息
+                return BinanceConverter.to_position(response)
             else:
                 # 過濾掉倉位數量為 0 的倉位
                 positions = []
                 for pos in response:
                     if Decimal(pos['positionAmt']) != 0:
-                        positions.append(PositionInfo(
-                            symbol=pos['symbol'],
-                            position_amt=Decimal(pos['positionAmt']),
-                            entry_price=Decimal(pos['entryPrice']),
-                            mark_price=Decimal(pos['markPrice']),
-                            un_realized_profit=Decimal(pos['unRealizedProfit']),
-                            liquidation_price=Decimal(pos['liquidationPrice']),
-                            leverage=int(pos['leverage']),
-                            max_notional_value=Decimal(pos['maxNotionalValue']),
-                            margin_type=pos['marginType'],
-                            isolated_margin=Decimal(pos['isolatedMargin']),
-                            is_auto_add_margin=pos['isAutoAddMargin']
-                        ))
+                        positions.append(BinanceConverter.to_position(pos))
                 return positions if positions else None
                 
         except Exception as e:
@@ -673,69 +517,9 @@ class OrderExecutor:
             # 下單
             order_info = self.api.new_order(**params)
             
-            # 構建訂單結果
-            return OrderResult(
-                symbol=order_info.symbol,
-                side=order_info.side,
-                type=order_info.type,
-                quantity=order_info.quantity,
-                transact_time=order_info.transact_time,
-                time_in_force=order_info.time_in_force,
-                order_id=order_info.order_id,
-                client_order_id=order_info.client_order_id,
-                price=order_info.price,
-                orig_qty=order_info.orig_qty,
-                executed_qty=order_info.executed_qty,
-                cummulative_quote_qty=order_info.cummulative_quote_qty,
-                status=order_info.status,
-                iceberg_qty=order_info.iceberg_qty,
-                time=order_info.time,
-                update_time=order_info.update_time,
-                is_working=order_info.is_working,
-                orig_quote_order_qty=order_info.orig_quote_order_qty,
-                stop_price=order_info.stop_price,
-                working_type=order_info.working_type,
-                price_protect=order_info.price_protect,
-                reduce_only=order_info.reduce_only,
-                close_position=order_info.close_position,
-                activation_price=order_info.activation_price,
-                callback_rate=order_info.callback_rate,
-                position_side=order_info.position_side,
-                price_match=order_info.price_match,
-                self_trade_prevention_mode=order_info.self_trade_prevention_mode,
-                good_till_date=order_info.good_till_date
-            )
+            # 使用轉換器構建訂單結果
+            return BinanceConverter.to_order_result(order_info)
             
         except Exception as e:
             logger.error(f"開限價倉位發生錯誤: {str(e)}")
-            raise
-
-    def _handle_position_update(self, response: Dict) -> None:
-        """處理倉位更新
-        
-        Args:
-            response: API 響應
-        """
-        try:
-            if Decimal(response.get('positionAmt', '0')) == 0:
-                return
-                
-            position = PositionInfo(
-                symbol=response.get('symbol'),
-                position_amt=Decimal(response.get('positionAmt', '0')),
-                entry_price=Decimal(response.get('entryPrice', '0')),
-                mark_price=Decimal(response.get('markPrice', '0')),
-                un_realized_profit=Decimal(response.get('unRealizedProfit', '0')),
-                liquidation_price=Decimal(response.get('liquidationPrice', '0')),
-                leverage=int(response.get('leverage', 1)),
-                max_notional_value=Decimal(response.get('maxNotionalValue', '0')),
-                margin_type=response.get('marginType', 'isolated'),
-                isolated_margin=Decimal(response.get('isolatedMargin', '0')),
-                is_auto_add_margin=response.get('isAutoAddMargin', False)
-            )
-            
-            self._update_position(position)
-            
-        except Exception as e:
-            logger.error(f"處理倉位更新失敗: {str(e)}")
             raise

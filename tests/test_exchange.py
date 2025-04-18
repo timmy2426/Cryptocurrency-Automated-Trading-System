@@ -71,8 +71,8 @@ order_updates = []
 # 測試開關
 TEST_MARKET_DATA = False  # 是否測試市場數據功能
 TEST_ACCOUNT_INFO = False  # 是否測試賬戶信息功能
-TEST_ORDER_OPERATIONS = True  # 是否測試訂單操作功能
-TEST_POSITION_OPERATIONS = False  # 是否測試倉位操作功能
+TEST_ORDER_OPERATIONS = False  # 是否測試訂單操作功能
+TEST_POSITION_OPERATIONS = True  # 是否測試倉位操作功能
 
 def signal_handler(signum, frame):
     """處理 Ctrl+C 信號"""
@@ -174,6 +174,8 @@ async def test_account_info(api: BinanceAPI):
             logger.info(f"所有倉位信息: {all_positions}")
         else:
             logger.info("沒有持倉")
+
+        logger.info("賬戶信息相關功能測試完成")
             
     except Exception as e:
         logger.error(f"測試賬戶信息時發生錯誤: {str(e)}")
@@ -302,7 +304,7 @@ async def test_position_operations(executor: OrderExecutor):
         
     try:
         # 1. 開BTC市價買單
-        logger.info("測試開BTC市價買單...")
+        logger.info("1.測試開BTC市價買單...")
         btc_market_order = Order(
             symbol=TEST_SYMBOL_BTC,
             side=OrderSide.BUY,
@@ -313,7 +315,7 @@ async def test_position_operations(executor: OrderExecutor):
         logger.info(f"BTC市價買單結果: {btc_market_result}")
         
         # 2. 開ETH市價賣單
-        logger.info("測試開ETH市價賣單...")
+        logger.info("2.測試開ETH市價賣單...")
         eth_market_order = Order(
             symbol=TEST_SYMBOL_ETH,
             side=OrderSide.SELL,
@@ -327,7 +329,7 @@ async def test_position_operations(executor: OrderExecutor):
         time.sleep(1)
         
         # 3. 設置BTC止損、止盈、移動止損單
-        logger.info("測試設置BTC止損、止盈、移動止損單...")
+        logger.info("3.測試設置BTC止損、止盈、移動止損單...")
         btc_position = executor.get_position(TEST_SYMBOL_BTC)
         if btc_position and btc_position.position_amt > 0:
             # 設置止損單
@@ -371,7 +373,7 @@ async def test_position_operations(executor: OrderExecutor):
             logger.info(f"BTC移動止損單結果: {btc_trailing_result}")
         
         # 4. 設置ETH止損、止盈、移動止損單
-        logger.info("測試設置ETH止損、止盈、移動止損單...")
+        logger.info("4.測試設置ETH止損、止盈、移動止損單...")
         eth_position = executor.get_position(TEST_SYMBOL_ETH)
         if eth_position and eth_position.position_amt < 0:
             # 設置止損單
@@ -415,12 +417,12 @@ async def test_position_operations(executor: OrderExecutor):
             logger.info(f"ETH移動止損單結果: {eth_trailing_result}")
         
         # 5. 平倉BTC艙位
-        logger.info("測試平倉BTC艙位...")
+        logger.info("5.測試平倉BTC艙位...")
         close_btc_result = executor.close_position(TEST_SYMBOL_BTC)
         logger.info(f"平倉BTC結果: {close_btc_result}")
         
         # 6. 再開一次BTC市價買單
-        logger.info("測試再次開BTC市價買單...")
+        logger.info("6.測試再次開BTC市價買單...")
         btc_market_order_again = Order(
             symbol=TEST_SYMBOL_BTC,
             side=OrderSide.BUY,
@@ -434,7 +436,7 @@ async def test_position_operations(executor: OrderExecutor):
         time.sleep(1)
         
         # 7. 設置BTC止損、止盈、移動止損單
-        logger.info("測試再次設置BTC止損、止盈、移動止損單...")
+        logger.info("7.測試再次設置BTC止損、止盈、移動止損單...")
         btc_position_again = executor.get_position(TEST_SYMBOL_BTC)
         if btc_position_again and btc_position_again.position_amt > 0:
             # 設置止損單
@@ -478,9 +480,11 @@ async def test_position_operations(executor: OrderExecutor):
             logger.info(f"BTC移動止損單結果: {btc_trailing_result_again}")
         
         # 8. 平掉所有倉位
-        logger.info("測試平掉所有倉位...")
+        logger.info("8.測試平掉所有倉位...")
         close_all_result = executor.close_all_positions()
         logger.info(f"平掉所有倉位結果: {close_all_result}")
+
+        logger.info("倉位操作功能測試完成")
         
     except Exception as e:
         logger.error(f"測試倉位操作時發生錯誤: {str(e)}")
@@ -543,12 +547,23 @@ def test_main():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
-        # 執行異步測試
-        loop.run_until_complete(test_market_data(api))
-        loop.run_until_complete(test_account_info(api))
-        loop.run_until_complete(test_order_operations())
-        loop.run_until_complete(test_position_operations(executor))
-        
+        # 根據測試開關執行相應的測試
+        if TEST_MARKET_DATA:
+            logger.info("執行市場數據測試...")
+            loop.run_until_complete(test_market_data(api))
+            
+        if TEST_ACCOUNT_INFO:
+            logger.info("執行賬戶信息測試...")
+            loop.run_until_complete(test_account_info(api))
+            
+        if TEST_ORDER_OPERATIONS:
+            logger.info("執行訂單操作測試...")
+            loop.run_until_complete(test_order_operations())
+            
+        if TEST_POSITION_OPERATIONS:
+            logger.info("執行倉位操作測試...")
+            loop.run_until_complete(test_position_operations(executor))
+            
     finally:
         # 清理
         api.close()

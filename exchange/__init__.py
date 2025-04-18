@@ -1,5 +1,6 @@
 from .binance_api import BinanceAPI
 from .order_executor import OrderExecutor
+from .converter import BinanceConverter
 from .enums import (
     OrderSide,
     OrderType,
@@ -22,6 +23,7 @@ import logging
 __all__ = [
     'BinanceAPI',
     'OrderExecutor',
+    'BinanceConverter',
     'OrderSide',
     'OrderType',
     'OrderStatus',
