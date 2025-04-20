@@ -49,7 +49,7 @@ class OrderBase:
     symbol: str
     side: OrderSide
     type: OrderType
-    quantity: Decimal
+    quantity: Optional[Decimal] = None
 
 @dataclass
 class BaseOrder(OrderBase):
@@ -84,12 +84,12 @@ class Order(OrderBase):
     price_match: Optional[PriceMatch] = None
     self_trade_prevention_mode: Optional[SelfTradePreventionMode] = None
     good_till_date: Optional[int] = None
-    activate_price: Optional[Decimal] = None  # 追蹤止損訂單的激活價格
-    price_rate: Optional[Decimal] = None  # 追蹤止損訂單的回調率
-    orig_type: Optional[OrderType] = None  # 原始訂單類型
-    avg_price: Optional[Decimal] = None  # 平均成交價格
+    activate_price: Optional[Decimal] = None
+    price_rate: Optional[Decimal] = None
+    orig_type: Optional[OrderType] = None
+    avg_price: Optional[Decimal] = None
     
-    # 訂單狀態相關字段
+    # 訂單狀態
     order_id: Optional[int] = None
     client_order_id: Optional[str] = None
     orig_qty: Optional[Decimal] = None
@@ -135,6 +135,7 @@ class OrderResult:
         self_trade_prevention_mode: 自成交防護模式
         good_till_date: 訂單到期時間
     """
+    # 必需參數
     symbol: str
     side: OrderSide
     type: OrderType
@@ -143,6 +144,8 @@ class OrderResult:
     time_in_force: TimeInForce
     order_id: int
     client_order_id: str
+    
+    # 可選參數
     price: Optional[Decimal] = None
     orig_qty: Optional[Decimal] = None
     executed_qty: Optional[Decimal] = None
@@ -171,50 +174,46 @@ class PositionInfo:
     
     Attributes:
         symbol: 交易對
+        position_side: 倉位方向（BOTH/LONG/SHORT）
         position_amt: 持倉數量
         entry_price: 開倉價格
+        break_even_price: 盈虧平衡價格
         mark_price: 標記價格
         un_realized_profit: 未實現盈虧
         liquidation_price: 強平價格
-        leverage: 槓桿倍數
-        max_notional_value: 最大名義價值
-        margin_type: 保證金類型
         isolated_margin: 逐倉保證金
-        is_auto_add_margin: 是否自動追加保證金
-        status: 倉位狀態
-        position_balance: 倉位餘額
-        margin_ratio: 保證金率
-        margin_ratio_level: 保證金率等級
-        update_time: 更新時間
-        stop_loss: 止損價格
-        take_profit: 止盈價格
-        close_reason: 平倉原因
-        close_price: 平倉價格
-        pnl_usdt: 盈虧（USDT）
-        pnl_percent: 盈虧百分比
+        notional: 名義價值
+        margin_asset: 保證金資產
+        isolated_wallet: 逐倉錢包
+        initial_margin: 初始保證金
+        maint_margin: 維持保證金
+        position_initial_margin: 持倉初始保證金
+        open_order_initial_margin: 開單初始保證金
+        adl: 自動減倉等級
+        bid_notional: 買方名義價值
+        ask_notional: 賣方名義價值
+        update_time: 更新時間（毫秒）
     """
     symbol: str
+    position_side: PositionSide
     position_amt: Decimal
     entry_price: Decimal
+    break_even_price: Decimal
     mark_price: Decimal
     un_realized_profit: Decimal
     liquidation_price: Decimal
-    leverage: int
-    max_notional_value: Decimal
-    margin_type: str
     isolated_margin: Decimal
-    is_auto_add_margin: bool
-    status: PositionStatus = PositionStatus.CLOSED
-    position_balance: Decimal = Decimal('0')
-    margin_ratio: Decimal = Decimal('0')
-    margin_ratio_level: str = ''
-    update_time: datetime = datetime.now()
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
-    close_reason: Optional[CloseReason] = None
-    close_price: Optional[float] = None
-    pnl_usdt: float = 0.0
-    pnl_percent: float = 0.0
+    notional: Decimal
+    margin_asset: str
+    isolated_wallet: Decimal
+    initial_margin: Decimal
+    maint_margin: Decimal
+    position_initial_margin: Decimal
+    open_order_initial_margin: Decimal
+    adl: int
+    bid_notional: Decimal
+    ask_notional: Decimal
+    update_time: int
 
 @dataclass
 class AccountInfo:

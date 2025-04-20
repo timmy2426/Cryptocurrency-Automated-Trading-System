@@ -46,7 +46,8 @@ class BinanceAPI:
                 'ping_interval',
                 'pong_timeout',
                 'reconnect_attempts',
-                'symbol_list'
+                'symbol_list',
+                'leverage'
             ])
             
             # 檢查是否有未設定的參數
@@ -64,9 +65,10 @@ class BinanceAPI:
             self.websocket_ping_timeout = config_params['pong_timeout']
             self.websocket_reconnect_attempts = config_params['reconnect_attempts']
             
-            # 設置交易對列表
+            # 設置交易參數
             self.symbol_list = config_params['symbol_list']
-            
+            self.leverage = config_params['leverage']
+
             # 初始化 REST API 客戶端
             base_url = config_params['testnet_rest_api_url'] if config_params['testnet'] else config_params['base_endpoint']
             self.client = UMFutures(
@@ -432,50 +434,29 @@ class BinanceAPI:
                     raise ValueError(f"交易對 {symbol} 不在配置的 symbol_list 中")
                     
                 response = self.client.get_position_risk(symbol=symbol)
+                
                 if not response:
                     logger.info(f"沒有找到 {symbol} 的持倉信息")
                     return None
                     
                 position = response[0]
+                
                 # 如果倉位數量為 0，返回 None
                 if Decimal(position['positionAmt']) == 0:
                     logger.info(f"{symbol} 沒有持倉")
                     return None
                     
-                return PositionInfo(
-                    symbol=position['symbol'],
-                    position_amt=Decimal(position['positionAmt']),
-                    entry_price=Decimal(position['entryPrice']),
-                    mark_price=Decimal(position['markPrice']),
-                    un_realized_profit=Decimal(position['unRealizedProfit']),
-                    liquidation_price=Decimal(position['liquidationPrice']),
-                    leverage=int(position['leverage']),
-                    max_notional_value=Decimal(position['maxNotionalValue']),
-                    margin_type=position['marginType'],
-                    isolated_margin=Decimal(position['isolatedMargin']),
-                    is_auto_add_margin=position['isAutoAddMargin']
-                )
+                return BinanceConverter.to_position(position)
             else:
                 # 獲取 symbol_list 中的所有倉位
                 positions = []
                 for symbol in self.symbol_list:
                     try:
                         response = self.client.get_position_risk(symbol=symbol)
+                        
                         if response and Decimal(response[0]['positionAmt']) != 0:  # 只返回有倉位的
                             position = response[0]
-                            positions.append(PositionInfo(
-                                symbol=position['symbol'],
-                                position_amt=Decimal(position['positionAmt']),
-                                entry_price=Decimal(position['entryPrice']),
-                                mark_price=Decimal(position['markPrice']),
-                                un_realized_profit=Decimal(position['unRealizedProfit']),
-                                liquidation_price=Decimal(position['liquidationPrice']),
-                                leverage=int(position['leverage']),
-                                max_notional_value=Decimal(position['maxNotionalValue']),
-                                margin_type=position['marginType'],
-                                isolated_margin=Decimal(position['isolatedMargin']),
-                                is_auto_add_margin=position['isAutoAddMargin']
-                            ))
+                            positions.append(BinanceConverter.to_position(position))
                     except Exception as e:
                         logger.error(f"獲取 {symbol} 倉位風險信息失敗: {str(e)}")
                         continue
@@ -486,65 +467,20 @@ class BinanceAPI:
             raise
             
     def get_account_info(self) -> AccountInfo:
-        """
-        獲取賬戶信息
+        """獲取帳戶信息
         
         Returns:
-            AccountInfo: 賬戶信息
+            AccountInfo: 帳戶信息對象
         """
         try:
-            account = self.client.account()
+            # 獲取帳戶信息
+            account_data = self.client.account()
             
-            return AccountInfo(
-                total_wallet_balance=float(account.get('totalWalletBalance', 0)),
-                total_unrealized_profit=float(account.get('totalUnrealizedProfit', 0)),
-                total_margin_balance=float(account.get('totalMarginBalance', 0)),
-                total_position_initial_margin=float(account.get('totalPositionInitialMargin', 0)),
-                total_open_order_initial_margin=float(account.get('totalOpenOrderInitialMargin', 0)),
-                total_cross_wallet_balance=float(account.get('totalCrossWalletBalance', 0)),
-                available_balance=float(account.get('availableBalance', 0)),
-                max_withdraw_amount=float(account.get('maxWithdrawAmount', 0)),
-                total_initial_margin=float(account.get('totalInitialMargin', 0)),
-                total_maint_margin=float(account.get('totalMaintMargin', 0)),
-                total_cross_un_pnl=float(account.get('totalCrossUnPnl', 0)),
-                assets=[{
-                    'asset': asset.get('asset', ''),
-                    'wallet_balance': float(asset.get('walletBalance', 0)),
-                    'unrealized_profit': float(asset.get('unrealizedProfit', 0)),
-                    'margin_balance': float(asset.get('marginBalance', 0)),
-                    'maint_margin': float(asset.get('maintMargin', 0)),
-                    'initial_margin': float(asset.get('initialMargin', 0)),
-                    'position_initial_margin': float(asset.get('positionInitialMargin', 0)),
-                    'open_order_initial_margin': float(asset.get('openOrderInitialMargin', 0)),
-                    'cross_wallet_balance': float(asset.get('crossWalletBalance', 0)),
-                    'cross_un_pnl': float(asset.get('crossUnPnl', 0)),
-                    'available_balance': float(asset.get('availableBalance', 0)),
-                    'max_withdraw_amount': float(asset.get('maxWithdrawAmount', 0)),
-                    'margin_available': bool(asset.get('marginAvailable', False)),
-                    'update_time': int(time.time() * 1000)
-                } for asset in account.get('assets', [])],
-                positions=[{
-                    'symbol': position.get('symbol', ''),
-                    'initial_margin': float(position.get('initialMargin', 0)),
-                    'maint_margin': float(position.get('maintMargin', 0)),
-                    'unrealized_profit': float(position.get('unrealizedProfit', 0)),
-                    'position_initial_margin': float(position.get('positionInitialMargin', 0)),
-                    'open_order_initial_margin': float(position.get('openOrderInitialMargin', 0)),
-                    'leverage': int(position.get('leverage', 1)),
-                    'isolated': bool(position.get('isolated', False)),
-                    'entry_price': float(position.get('entryPrice', 0)),
-                    'max_notional': float(position.get('maxNotional', 0)),
-                    'position_side': position.get('positionSide', 'BOTH'),
-                    'position_amt': float(position.get('positionAmt', 0)),
-                    'notional': float(position.get('notional', 0)),
-                    'isolated_wallet': float(position.get('isolatedWallet', 0)),
-                    'update_time': int(time.time() * 1000)
-                } for position in account.get('positions', [])],
-                update_time=int(time.time() * 1000)
-            )
+            # 使用轉換器轉換數據
+            return BinanceConverter.to_account_info(account_data)
             
         except Exception as e:
-            logger.error(f"獲取賬戶信息失敗: {str(e)}")
+            logger.error(f"獲取帳戶信息失敗: {str(e)}")
             raise
             
     def get_exchange_info(self) -> Dict:
@@ -942,13 +878,21 @@ class BinanceAPI:
         """
         try:
             # 檢查必要參數
-            required_params = ['symbol', 'side', 'type', 'quantity']
+            required_params = ['symbol', 'side', 'type']
             for param in required_params:
                 if param not in params:
                     raise ValueError(f"缺少必要參數: {param}")
             
             # 根據訂單類型檢查其他必要參數
             order_type = params['type']
+            
+            # 檢查 reduce_only 和 close_position
+            if 'reduceOnly' in params and 'closePosition' in params:
+                raise ValueError("不能同時設置 reduceOnly 和 closePosition")
+            
+            # 檢查數量相關參數
+            if 'closePosition' not in params and 'reduceOnly' not in params and 'quantity' not in params:
+                raise ValueError("必須指定數量或設置 closePosition 或 reduceOnly")
             
             # 限價單、止損限價單、止盈限價單需要價格
             if order_type in [OrderType.LIMIT, OrderType.STOP, OrderType.TAKE_PROFIT]:
@@ -975,10 +919,6 @@ class BinanceAPI:
                 if not params['callbackRate'] or float(params['callbackRate']) <= 0:
                     raise ValueError("移動止損訂單回調率必須大於0")
             
-            # 檢查數量
-            if not params['quantity'] or float(params['quantity']) <= 0:
-                raise ValueError("訂單數量必須大於0")
-            
             # 檢查 timeInForce
             if order_type in [OrderType.LIMIT, OrderType.STOP, OrderType.TAKE_PROFIT]:
                 if 'timeInForce' not in params:
@@ -998,6 +938,7 @@ class BinanceAPI:
         except Exception as e:
             logger.error(f"下單失敗: {str(e)}")
             raise
+        
     def close(self):
         """關閉 API 連接"""
         try:

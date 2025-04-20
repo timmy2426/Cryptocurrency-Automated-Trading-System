@@ -1,7 +1,8 @@
-binance-futures-connector==4.0.0
+binance-futures-connector==4.1.0
 python-dotenv==1.0.0
 pandas==2.0.3
 pyyaml==6.0.1
+websocket-client==1.8.0
 ta==0.10.2
 discord-webhook==1.2.0
 schedule==1.2.0 

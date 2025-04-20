@@ -31,7 +31,7 @@ trading:
     - ADAUSDT
   leverage: 5
   price_protect: true
-  trailing_percent: 0.012
+  trailing_percent: 1.2
   max_loss_percent: 0.012
   mean_reversion_tp: 0.018
   mean_reversion_sl: 0.01

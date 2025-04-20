@@ -173,10 +173,11 @@ class OrderExecutor:
         self._check_symbol_trading_status(order.symbol)
         
         # 檢查數量限制
-        self._check_quantity_limits(order.symbol, order.quantity)
+        if order.quantity is not None:
+            self._check_quantity_limits(order.symbol, order.quantity)
         
         # 檢查最小名義價值
-        if order.type == OrderType.MARKET:
+        if order.type == OrderType.MARKET and order.quantity is not None:
             # 獲取當前價格
             current_price = self.api.get_current_price(order.symbol)
             if current_price is None:
@@ -202,6 +203,14 @@ class OrderExecutor:
             if not order.stop_price:
                 raise ValueError("止損單必須指定止損價格")
             self._check_stop_price_limits(order.symbol, order.stop_price)
+            
+        # 檢查 reduce_only 和 close_position
+        if order.reduce_only and order.close_position:
+            raise ValueError("不能同時設置 reduce_only 和 close_position")
+            
+        # 檢查數量相關參數
+        if not order.close_position and not order.reduce_only and order.quantity is None:
+            raise ValueError("必須指定數量或設置 close_position 或 reduce_only")
 
     def open_position_market(self, order: Order) -> OrderResult:
         """市價開倉
@@ -216,20 +225,34 @@ class OrderExecutor:
             # 設置訂單類型為市價單
             order.type = OrderType.MARKET
             
+            # 構建訂單參數
+            params = {
+                'symbol': order.symbol,
+                'side': order.side.value,
+                'type': order.type.value,
+                'quantity': str(order.quantity)
+            }
+            
+            # 只在平倉時添加 reduce_only 和 close_position
+            if order.reduce_only:
+                params['reduceOnly'] = True
+            if order.close_position:
+                params['closePosition'] = True
+                
+            # 添加其他可選參數
+            if order.position_side:
+                params['positionSide'] = order.position_side.value
+            if order.working_type:
+                params['workingType'] = order.working_type.value
+            if order.price_protect:
+                params['priceProtect'] = order.price_protect
+            if order.new_client_order_id:
+                params['newClientOrderId'] = order.new_client_order_id
+            if order.time_in_force:
+                params['timeInForce'] = order.time_in_force.value
+            
             # 下單
-            order_info = self.api.new_order(
-                symbol=order.symbol,
-                side=order.side,
-                type=order.type,
-                quantity=order.quantity,
-                position_side=order.position_side,
-                reduce_only=order.reduce_only,
-                close_position=order.close_position,
-                working_type=order.working_type,
-                price_protect=order.price_protect,
-                new_client_order_id=order.new_client_order_id,
-                time_in_force=order.time_in_force
-            )
+            order_info = self.api.new_order(**params)
             
             # 使用轉換器構建訂單結果
             return BinanceConverter.to_order_result(order_info)
@@ -248,22 +271,34 @@ class OrderExecutor:
             self._check_order_limits(order)
             
             # 構建訂單參數
-            order_params = {
+            params = {
                 'symbol': order.symbol,
                 'side': order.side.value,
                 'type': order.type.value,
-                'quantity': str(order.quantity),
-                'stopPrice': str(order.stop_price),
-                'timeInForce': order.time_in_force.value if order.time_in_force else None,
-                'reduceOnly': order.reduce_only,
-                'closePosition': order.close_position,
-                'workingType': order.working_type.value if order.working_type else None,
-                'priceProtect': order.price_protect,
-                'newClientOrderId': order.new_client_order_id
+                'stopPrice': str(order.stop_price)
             }
             
+            # 只在平倉時添加 reduce_only 和 close_position
+            if order.reduce_only:
+                params['reduceOnly'] = True
+            if order.close_position:
+                params['closePosition'] = True
+            else:
+                # 如果不是平倉，必須指定數量
+                params['quantity'] = str(order.quantity)
+                
+            # 添加其他可選參數
+            if order.time_in_force:
+                params['timeInForce'] = order.time_in_force.value
+            if order.working_type:
+                params['workingType'] = order.working_type.value
+            if order.price_protect:
+                params['priceProtect'] = order.price_protect
+            if order.new_client_order_id:
+                params['newClientOrderId'] = order.new_client_order_id
+            
             # 下單
-            order_info = self.api.new_order(**order_params)
+            order_info = self.api.new_order(**params)
             
             # 使用轉換器構建訂單結果
             return BinanceConverter.to_order_result(order_info)
@@ -285,22 +320,34 @@ class OrderExecutor:
             self._check_order_limits(order)
             
             # 構建訂單參數
-            order_params = {
+            params = {
                 'symbol': order.symbol,
                 'side': order.side.value,
                 'type': order.type.value,
-                'quantity': str(order.quantity),
-                'stopPrice': str(order.stop_price),
-                'timeInForce': order.time_in_force.value if order.time_in_force else None,
-                'reduceOnly': order.reduce_only,
-                'closePosition': order.close_position,
-                'workingType': order.working_type.value if order.working_type else None,
-                'priceProtect': order.price_protect,
-                'newClientOrderId': order.new_client_order_id
+                'stopPrice': str(order.stop_price)
             }
             
+            # 只在平倉時添加 reduce_only 和 close_position
+            if order.reduce_only:
+                params['reduceOnly'] = True
+            if order.close_position:
+                params['closePosition'] = True
+            else:
+                # 如果不是平倉，必須指定數量
+                params['quantity'] = str(order.quantity)
+                
+            # 添加其他可選參數
+            if order.time_in_force:
+                params['timeInForce'] = order.time_in_force.value
+            if order.working_type:
+                params['workingType'] = order.working_type.value
+            if order.price_protect:
+                params['priceProtect'] = order.price_protect
+            if order.new_client_order_id:
+                params['newClientOrderId'] = order.new_client_order_id
+            
             # 下單
-            order_info = self.api.new_order(**order_params)
+            order_info = self.api.new_order(**params)
             
             # 使用轉換器構建訂單結果
             return BinanceConverter.to_order_result(order_info)
@@ -312,7 +359,7 @@ class OrderExecutor:
             logger.error(f"開止損倉位發生錯誤: {str(e)}")
             raise
 
-    def open_position_trailing(self, order: Order, activation_price: float, callback_rate: float) -> OrderResult:
+    def open_position_trailing(self, order: Order, activate_price: float, price_rate: float) -> OrderResult:
         """開追蹤止損倉位"""
         try:
             # 設置交易配置
@@ -322,23 +369,35 @@ class OrderExecutor:
             self._check_order_limits(order)
             
             # 構建訂單參數
-            order_params = {
+            params = {
                 'symbol': order.symbol,
                 'side': order.side.value,
                 'type': order.type.value,
-                'quantity': str(order.quantity),
-                'activationPrice': str(activation_price),
-                'callbackRate': str(callback_rate),
-                'timeInForce': order.time_in_force.value if order.time_in_force else None,
-                'reduceOnly': order.reduce_only,
-                'closePosition': order.close_position,
-                'workingType': order.working_type.value if order.working_type else None,
-                'priceProtect': order.price_protect,
-                'newClientOrderId': order.new_client_order_id
+                'activationPrice': str(activate_price),
+                'callbackRate': str(price_rate)
             }
             
+            # 只在平倉時添加 reduce_only 和 close_position
+            if order.reduce_only:
+                params['reduceOnly'] = True
+            if order.close_position:
+                params['closePosition'] = True
+            else:
+                # 如果不是平倉，必須指定數量
+                params['quantity'] = str(order.quantity)
+                
+            # 添加其他可選參數
+            if order.time_in_force:
+                params['timeInForce'] = order.time_in_force.value
+            if order.working_type:
+                params['workingType'] = order.working_type.value
+            if order.price_protect:
+                params['priceProtect'] = order.price_protect
+            if order.new_client_order_id:
+                params['newClientOrderId'] = order.new_client_order_id
+            
             # 下單
-            order_info = self.api.new_order(**order_params)
+            order_info = self.api.new_order(**params)
             
             # 使用轉換器構建訂單結果
             return BinanceConverter.to_order_result(order_info)
@@ -372,16 +431,16 @@ class OrderExecutor:
         try:
             # 獲取當前持倉信息
             position_info = self.api.get_position_risk(symbol)
-            if not position_info or position_info['positionAmt'] == 0:
+            if not position_info or position_info.position_amt == 0:
                 logger.info(f"沒有找到 {symbol} 的持倉信息或持倉數量為0")
                 return None
                 
             # 構建平倉訂單
             order = Order(
                 symbol=symbol,
-                side=OrderSide.SELL if position_info['positionAmt'] > 0 else OrderSide.BUY,
+                side=OrderSide.SELL if position_info.position_amt > 0 else OrderSide.BUY,
                 type=OrderType.MARKET,
-                quantity=abs(position_info['positionAmt']),
+                quantity=abs(position_info.position_amt),
                 reduce_only=True
             )
             
@@ -412,25 +471,63 @@ class OrderExecutor:
             logger.error(f"平倉發生錯誤: {str(e)}")
             raise
 
-    def close_all_positions(self) -> List[OrderResult]:
-        """平掉所有倉位"""
+    def close_all_positions(self, symbol: Optional[str] = None) -> List[OrderResult]:
+        """平掉所有倉位
+        
+        Args:
+            symbol: 交易對，如果為 None 則平掉所有交易對的倉位
+        """
         try:
-            # 獲取所有持倉信息
-            positions = self.api.get_position_risk()
-            if not positions:
-                logger.info("沒有找到任何持倉")
-                return []
+            if symbol:
+                # 檢查交易對是否在 symbol_list 中
+                if symbol not in self.api.symbol_list:
+                    raise ValueError(f"交易對 {symbol} 不在配置的 symbol_list 中")
+                    
+                # 獲取指定交易對的持倉信息
+                position = self.api.get_position_risk(symbol)
+                if not position or position.position_amt == 0:
+                    logger.info(f"沒有找到 {symbol} 的持倉信息或持倉數量為0")
+                    return []
+                    
+                # 構建平倉訂單
+                order = Order(
+                    symbol=position.symbol,
+                    side=OrderSide.SELL if position.position_amt > 0 else OrderSide.BUY,
+                    type=OrderType.MARKET,
+                    quantity=abs(position.position_amt),
+                    reduce_only=True
+                )
                 
-            results = []
-            for position in positions:
-                if position['positionAmt'] != 0:
+                # 下單
+                order_info = self.api.new_order(
+                    symbol=order.symbol,
+                    side=order.side.value,
+                    type=order.type.value,
+                    quantity=str(order.quantity),
+                    reduceOnly=order.reduce_only
+                )
+                
+                # 使用轉換器構建訂單結果
+                result = BinanceConverter.to_order_result(order_info)
+                logger.info(f"平倉成功: {position.symbol}")
+                return [result]
+                
+            else:
+                # 平掉所有交易對的倉位
+                results = []
+                for symbol in self.api.symbol_list:
                     try:
+                        # 獲取持倉信息
+                        position = self.api.get_position_risk(symbol)
+                        if not position or position.position_amt == 0:
+                            continue
+                            
                         # 構建平倉訂單
                         order = Order(
-                            symbol=position['symbol'],
-                            side=OrderSide.SELL if position['positionAmt'] > 0 else OrderSide.BUY,
+                            symbol=position.symbol,
+                            side=OrderSide.SELL if position.position_amt > 0 else OrderSide.BUY,
                             type=OrderType.MARKET,
-                            quantity=abs(position['positionAmt']),
+                            quantity=abs(position.position_amt),
                             reduce_only=True
                         )
                         
@@ -446,14 +543,14 @@ class OrderExecutor:
                         # 使用轉換器構建訂單結果
                         result = BinanceConverter.to_order_result(order_info)
                         results.append(result)
-                        logger.info(f"平倉成功: {position['symbol']}")
+                        logger.info(f"平倉成功: {position.symbol}")
                         
                     except Exception as e:
-                        logger.error(f"平倉失敗 {position['symbol']}: {str(e)}")
+                        logger.error(f"平倉失敗 {symbol}: {str(e)}")
                         continue
-                    
-            return results
-            
+                        
+                return results
+                
         except Exception as e:
             logger.error(f"平掉所有倉位發生錯誤: {str(e)}")
             raise
@@ -467,17 +564,15 @@ class OrderExecutor:
                 
             if symbol:
                 # 如果倉位數量為 0，返回 None
-                if Decimal(response['positionAmt']) == 0:
+                if Decimal(response.position_amt) == 0:
                     return None
-                    
-                # 使用轉換器構建倉位信息
-                return BinanceConverter.to_position(response)
+                return response
             else:
                 # 過濾掉倉位數量為 0 的倉位
                 positions = []
                 for pos in response:
-                    if Decimal(pos['positionAmt']) != 0:
-                        positions.append(BinanceConverter.to_position(pos))
+                    if Decimal(pos.position_amt) != 0:
+                        positions.append(pos)
                 return positions if positions else None
                 
         except Exception as e:

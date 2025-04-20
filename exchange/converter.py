@@ -1,7 +1,7 @@
 from typing import Dict, Optional
 from decimal import Decimal
 import logging
-from .data_models import Order, OrderResult, PositionInfo
+from .data_models import Order, OrderResult, PositionInfo, AccountInfo
 from .enums import (
     OrderSide, OrderType, OrderStatus, TimeInForce, WorkingType,
     PositionSide, PriceMatch, SelfTradePreventionMode, PositionStatus, CloseReason
@@ -143,53 +143,49 @@ class BinanceConverter:
                 position = position_data.get('a', {}).get('P', [{}])[0]
                 return PositionInfo(
                     symbol=position.get('s', ''),
+                    position_side=position.get('ps', 'BOTH'),
                     position_amt=Decimal(str(position.get('pa', 0))),
                     entry_price=Decimal(str(position.get('ep', 0))),
+                    break_even_price=Decimal(str(position.get('bep', 0))),
                     mark_price=Decimal(str(position.get('mp', 0))),
                     un_realized_profit=Decimal(str(position.get('up', 0))),
                     liquidation_price=Decimal(str(position.get('lp', 0))),
-                    leverage=int(position.get('l', 1)),
-                    max_notional_value=Decimal(str(position.get('mnv', 0))),
-                    margin_type=position.get('mt', 'isolated'),
                     isolated_margin=Decimal(str(position.get('im', 0))),
-                    is_auto_add_margin=position.get('iam', False),
-                    status=PositionStatus.OPEN if float(position.get('pa', 0)) != 0 else PositionStatus.CLOSED,
-                    stop_loss=float(position.get('sl', 0)) if position.get('sl') else None,
-                    take_profit=float(position.get('tp', 0)) if position.get('tp') else None,
-                    close_reason=BinanceConverter._get_close_reason(position),
-                    close_price=float(position.get('cp', 0)) if position.get('cp') else None,
-                    pnl_usdt=float(position.get('up', 0)),
-                    pnl_percent=float(position.get('cr', 0)),
-                    position_balance=Decimal(str(position.get('pb', 0))),
-                    margin_ratio=Decimal(str(position.get('mr', 0))) if position.get('mr') else None,
-                    margin_ratio_level=position.get('mrl', ''),
-                    update_time=datetime.fromtimestamp(position.get('t', 0) / 1000)
+                    notional=Decimal(str(position.get('n', 0))),
+                    margin_asset=position.get('ma', 'USDT'),
+                    isolated_wallet=Decimal(str(position.get('iw', 0))),
+                    initial_margin=Decimal(str(position.get('im', 0))),
+                    maint_margin=Decimal(str(position.get('mm', 0))),
+                    position_initial_margin=Decimal(str(position.get('pim', 0))),
+                    open_order_initial_margin=Decimal(str(position.get('oim', 0))),
+                    adl=int(position.get('adl', 0)),
+                    bid_notional=Decimal(str(position.get('bn', 0))),
+                    ask_notional=Decimal(str(position.get('an', 0))),
+                    update_time=int(position.get('t', 0))
                 )
             else:
                 # REST API 格式
                 return PositionInfo(
                     symbol=position_data.get('symbol', ''),
+                    position_side=position_data.get('positionSide', 'BOTH'),
                     position_amt=Decimal(str(position_data.get('positionAmt', 0))),
                     entry_price=Decimal(str(position_data.get('entryPrice', 0))),
+                    break_even_price=Decimal(str(position_data.get('breakEvenPrice', 0))),
                     mark_price=Decimal(str(position_data.get('markPrice', 0))),
                     un_realized_profit=Decimal(str(position_data.get('unRealizedProfit', 0))),
                     liquidation_price=Decimal(str(position_data.get('liquidationPrice', 0))),
-                    leverage=int(position_data.get('leverage', 1)),
-                    max_notional_value=Decimal(str(position_data.get('maxNotionalValue', 0))),
-                    margin_type=position_data.get('marginType', 'isolated'),
                     isolated_margin=Decimal(str(position_data.get('isolatedMargin', 0))),
-                    is_auto_add_margin=position_data.get('isAutoAddMargin', False),
-                    status=PositionStatus.OPEN if float(position_data.get('positionAmt', 0)) != 0 else PositionStatus.CLOSED,
-                    stop_loss=float(position_data.get('stopLoss', 0)) if position_data.get('stopLoss') else None,
-                    take_profit=float(position_data.get('takeProfit', 0)) if position_data.get('takeProfit') else None,
-                    close_reason=BinanceConverter._get_close_reason(position_data),
-                    close_price=float(position_data.get('closePrice', 0)) if position_data.get('closePrice') else None,
-                    pnl_usdt=float(position_data.get('unRealizedProfit', 0)),
-                    pnl_percent=float(position_data.get('closeRatio', 0)) if position_data.get('closeRatio') else None,
-                    position_balance=Decimal(str(position_data.get('positionBalance', 0))),
-                    margin_ratio=Decimal(str(position_data.get('marginRatio', 0))) if position_data.get('marginRatio') else None,
-                    margin_ratio_level=position_data.get('marginRatioLevel', ''),
-                    update_time=datetime.fromtimestamp(int(time.time() * 1000))
+                    notional=Decimal(str(position_data.get('notional', 0))),
+                    margin_asset=position_data.get('marginAsset', 'USDT'),
+                    isolated_wallet=Decimal(str(position_data.get('isolatedWallet', 0))),
+                    initial_margin=Decimal(str(position_data.get('initialMargin', 0))),
+                    maint_margin=Decimal(str(position_data.get('maintMargin', 0))),
+                    position_initial_margin=Decimal(str(position_data.get('positionInitialMargin', 0))),
+                    open_order_initial_margin=Decimal(str(position_data.get('openOrderInitialMargin', 0))),
+                    adl=int(position_data.get('adl', 0)),
+                    bid_notional=Decimal(str(position_data.get('bidNotional', 0))),
+                    ask_notional=Decimal(str(position_data.get('askNotional', 0))),
+                    update_time=int(position_data.get('updateTime', 0))
                 )
         except Exception as e:
             logger.error(f"轉換倉位數據失敗: {str(e)}")
@@ -224,3 +220,61 @@ class BinanceConverter:
         except Exception as e:
             logger.error(f"獲取平倉原因失敗: {str(e)}")
             return None
+
+    @staticmethod
+    def to_account_info(account_data: Dict) -> AccountInfo:
+        """將幣安 API 返回的帳戶數據轉換為 AccountInfo 對象
+        
+        Args:
+            account_data: 幣安 API 返回的帳戶數據
+            
+        Returns:
+            AccountInfo: 轉換後的帳戶信息對象
+        """
+        return AccountInfo(
+            total_wallet_balance=float(account_data.get('totalWalletBalance', 0)),
+            total_unrealized_profit=float(account_data.get('totalUnrealizedProfit', 0)),
+            total_margin_balance=float(account_data.get('totalMarginBalance', 0)),
+            total_position_initial_margin=float(account_data.get('totalPositionInitialMargin', 0)),
+            total_open_order_initial_margin=float(account_data.get('totalOpenOrderInitialMargin', 0)),
+            total_cross_wallet_balance=float(account_data.get('totalCrossWalletBalance', 0)),
+            available_balance=float(account_data.get('availableBalance', 0)),
+            max_withdraw_amount=float(account_data.get('maxWithdrawAmount', 0)),
+            total_initial_margin=float(account_data.get('totalInitialMargin', 0)),
+            total_maint_margin=float(account_data.get('totalMaintMargin', 0)),
+            total_cross_un_pnl=float(account_data.get('totalCrossUnPnl', 0)),
+            assets=[{
+                'asset': asset.get('asset', ''),
+                'wallet_balance': float(asset.get('walletBalance', 0)),
+                'unrealized_profit': float(asset.get('unrealizedProfit', 0)),
+                'margin_balance': float(asset.get('marginBalance', 0)),
+                'maint_margin': float(asset.get('maintMargin', 0)),
+                'initial_margin': float(asset.get('initialMargin', 0)),
+                'position_initial_margin': float(asset.get('positionInitialMargin', 0)),
+                'open_order_initial_margin': float(asset.get('openOrderInitialMargin', 0)),
+                'cross_wallet_balance': float(asset.get('crossWalletBalance', 0)),
+                'cross_un_pnl': float(asset.get('crossUnPnl', 0)),
+                'available_balance': float(asset.get('availableBalance', 0)),
+                'max_withdraw_amount': float(asset.get('maxWithdrawAmount', 0)),
+                'margin_available': bool(asset.get('marginAvailable', False)),
+                'update_time': int(time.time() * 1000)
+            } for asset in account_data.get('assets', [])],
+            positions=[{
+                'symbol': position.get('symbol', ''),
+                'initial_margin': float(position.get('initialMargin', 0)),
+                'maint_margin': float(position.get('maintMargin', 0)),
+                'unrealized_profit': float(position.get('unrealizedProfit', 0)),
+                'position_initial_margin': float(position.get('positionInitialMargin', 0)),
+                'open_order_initial_margin': float(position.get('openOrderInitialMargin', 0)),
+                'leverage': int(position.get('leverage', 1)),
+                'isolated': bool(position.get('isolated', False)),
+                'entry_price': float(position.get('entryPrice', 0)),
+                'max_notional': float(position.get('maxNotional', 0)),
+                'position_side': position.get('positionSide', 'BOTH'),
+                'position_amt': float(position.get('positionAmt', 0)),
+                'notional': float(position.get('notional', 0)),
+                'isolated_wallet': float(position.get('isolatedWallet', 0)),
+                'update_time': int(time.time() * 1000)
+            } for position in account_data.get('positions', [])],
+            update_time=int(time.time() * 1000)
+        )
