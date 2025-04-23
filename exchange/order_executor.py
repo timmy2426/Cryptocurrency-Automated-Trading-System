@@ -5,11 +5,11 @@ import time
 from decimal import Decimal
 from datetime import datetime
 
-from .enums import OrderSide, OrderType, OrderStatus, TimeInForce, PositionStatus, CloseReason, WorkingType
+from .enums import OrderSide, OrderType, NewOrderRespType, OrderStatus, TimeInForce, PositionStatus, CloseReason, WorkingType
 from .data_models import OrderResult, PositionInfo, Order, AccountInfo
 from .binance_api import BinanceAPI
 from .converter import BinanceConverter
-from core import check_config_parameters
+from utils.config import check_config_parameters
 
 logger = logging.getLogger(__name__)
 
@@ -426,7 +426,7 @@ class OrderExecutor:
         """取消所有訂單"""
         return self.api.cancel_all_orders(symbol)
         
-    def close_position(self, symbol: str, max_retries: int = 3) -> OrderResult:
+    def close_position(self, symbol: str, max_retries: int = 5) -> OrderResult:
         """平倉"""
         try:
             # 獲取當前持倉信息
@@ -441,7 +441,8 @@ class OrderExecutor:
                 side=OrderSide.SELL if position_info.position_amt > 0 else OrderSide.BUY,
                 type=OrderType.MARKET,
                 quantity=abs(position_info.position_amt),
-                reduce_only=True
+                reduce_only=True,
+                newOrderRespType=NewOrderRespType.RESULT
             )
             
             # 嘗試平倉
@@ -453,7 +454,8 @@ class OrderExecutor:
                         side=order.side.value,
                         type=order.type.value,
                         quantity=str(order.quantity),
-                        reduceOnly=order.reduce_only
+                        reduceOnly=order.reduce_only,
+                        newOrderRespType=order.newOrderRespType.value
                     )
                     
                     # 使用轉換器構建訂單結果
@@ -462,7 +464,7 @@ class OrderExecutor:
                 except ClientError as e:
                     if attempt < max_retries - 1:
                         logger.warning(f"平倉失敗，重試中... ({attempt + 1}/{max_retries})")
-                        time.sleep(1)
+                        time.sleep(30)
                     else:
                         logger.error(f"平倉失敗: {str(e)}")
                         raise
@@ -495,7 +497,8 @@ class OrderExecutor:
                     side=OrderSide.SELL if position.position_amt > 0 else OrderSide.BUY,
                     type=OrderType.MARKET,
                     quantity=abs(position.position_amt),
-                    reduce_only=True
+                    reduce_only=True,
+                    newOrderRespType=NewOrderRespType.RESULT
                 )
                 
                 # 下單
@@ -504,7 +507,8 @@ class OrderExecutor:
                     side=order.side.value,
                     type=order.type.value,
                     quantity=str(order.quantity),
-                    reduceOnly=order.reduce_only
+                    reduceOnly=order.reduce_only,
+                    newOrderRespType=order.newOrderRespType.value
                 )
                 
                 # 使用轉換器構建訂單結果
@@ -528,7 +532,8 @@ class OrderExecutor:
                             side=OrderSide.SELL if position.position_amt > 0 else OrderSide.BUY,
                             type=OrderType.MARKET,
                             quantity=abs(position.position_amt),
-                            reduce_only=True
+                            reduce_only=True,
+                            newOrderRespType=NewOrderRespType.RESULT
                         )
                         
                         # 下單
@@ -537,7 +542,8 @@ class OrderExecutor:
                             side=order.side.value,
                             type=order.type.value,
                             quantity=str(order.quantity),
-                            reduceOnly=order.reduce_only
+                            reduceOnly=order.reduce_only,
+                            newOrderRespType=order.newOrderRespType.value
                         )
                         
                         # 使用轉換器構建訂單結果

@@ -17,7 +17,7 @@ import ssl
 from .enums import OrderSide, PositionStatus, CloseReason, OrderType, OrderStatus, WorkingType, TimeInForce, PriceMatch, SelfTradePreventionMode, PositionSide
 from .data_models import PositionInfo, AccountInfo, Order, OrderResult
 from .converter import BinanceConverter
-from core import check_config_parameters
+from utils.config import check_config_parameters
 
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
