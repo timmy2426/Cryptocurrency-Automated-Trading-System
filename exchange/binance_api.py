@@ -80,10 +80,13 @@ class BinanceAPI:
             
             # 初始化 WebSocket 相關屬性
             self.position_callback = None
+            self.order_callback = None
             self._keepalive_running = False
             self._keepalive_thread = None
             self.ws_client = None
             self.listen_key = None
+            self._reconnecting = False
+            self._listen_key_attempts = 0
             self._reconnect_attempts = 0
             
             # 啟用 WebSocket 調試日誌
@@ -144,7 +147,11 @@ class BinanceAPI:
         self._keepalive_thread.start()
         logger.info("已啟動 listenKey 保活任務")
 
-    def start_position_listener(self, callback: Callable[[PositionInfo], None]) -> None:
+    def start_position_listener(
+        self, 
+        position_callback: Callable[[PositionInfo], None],
+        order_callback: Callable[[Order], None]
+    ) -> None:
         """啟動倉位監聽器"""
         try:
             # 檢查 WebSocket 客戶端狀態
@@ -153,10 +160,11 @@ class BinanceAPI:
                 return
                 
             # 檢查回調函數
-            if not callable(callback):
+            if not callable(position_callback) or not callable(order_callback):
                 raise ValueError("回調函數必須是可調用的")
                 
-            self.position_callback = callback
+            self.position_callback = position_callback
+            self.order_callback = order_callback
             
             # 先獲取 listenKey
             try:
@@ -182,17 +190,16 @@ class BinanceAPI:
             
             def on_error(ws, error):
                 logger.error(f"WebSocket 錯誤: {str(error)}")
-                time.sleep(1)
-                self._reconnect_websocket()
             
             def on_close(ws, close_status_code, close_msg):
                 logger.warning(f"WebSocket 連接關閉: {close_status_code} - {close_msg}")
-                time.sleep(1)
+                if self._reconnecting:
+                    logger.warning("已經在重連過程中，忽略新的重連請求")
+                    return
                 self._reconnect_websocket()
             
             def on_open(ws):
                 logger.info("WebSocket 連接已建立")
-                self._reconnect_attempts = 0
             
             # 構建 WebSocket URL，確保以 wss:// 開頭且不以 /ws 結尾
             ws_url = self.ws_base_url.rstrip('/ws')
@@ -240,15 +247,46 @@ class BinanceAPI:
             self.stop_position_listener()
             raise
 
+    def _reconnect_listen_key(self) -> bool:
+        """重新獲取 listenKey
+        
+        Returns:
+            bool: 是否成功獲取 listenKey
+        """
+        try:
+            if not hasattr(self, '_listen_key_attempts'):
+                self._listen_key_attempts = 0
+            
+            self._listen_key_attempts += 1
+            logger.warning(f"嘗試重新獲取 ListenKey (第 {self._listen_key_attempts} 次)")
+            
+            # 等待一段時間再重試
+            wait_time = 2 ** self._listen_key_attempts  # 指數退避
+            logger.info(f"等待 {wait_time} 秒後重試...")
+            time.sleep(wait_time)
+            
+            # 嘗試獲取新的 listenKey
+            try:
+                self.listen_key = self._get_listen_key()
+                if self.listen_key:
+                    logger.info(f"成功獲取新的 ListenKey: {self.listen_key}")
+                    self._listen_key_attempts = 0  # 重置重試計數器
+                    return True
+            except Exception as e:
+                logger.error(f"獲取 ListenKey 失敗: {str(e)}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"重新獲取 ListenKey 過程中發生錯誤: {str(e)}")
+            return False
+
     def _reconnect_websocket(self):
         """重新連接 WebSocket"""
         try:
-            if not hasattr(self, '_reconnect_attempts'):
-                self._reconnect_attempts = 0
-                
+            self._reconnecting = True
+            
             if self._reconnect_attempts >= self.websocket_reconnect_attempts:
                 logger.error("WebSocket 重連次數已達上限，請檢查網絡連接或重啟程序")
-                self._reconnect_attempts = 0
                 return
                 
             self._reconnect_attempts += 1
@@ -268,19 +306,18 @@ class BinanceAPI:
                     self.ws_client.close()
                 except:
                     pass
-                
+            
             # 等待一段時間再重連
-            time.sleep(2 ** self._reconnect_attempts)  # 指數退避
-                
+            wait_time = 2 ** self._reconnect_attempts  # 指數退避
+            logger.info(f"等待 {wait_time} 秒後重試...")
+            time.sleep(wait_time)
+            
             # 獲取新的 listenKey
-            try:
-                self.listen_key = self._get_listen_key()
-                if not self.listen_key:
-                    raise ValueError("獲取 listenKey 失敗")
-                logger.info(f"重連：成功獲取新的 listenKey: {self.listen_key}")
-            except Exception as e:
-                logger.error(f"重連：獲取 listenKey 失敗: {str(e)}")
-                return
+            while not self._reconnect_listen_key():
+                logger.error("重連：無法獲取 ListenKey，將繼續重試")
+                if self._listen_key_attempts >= self.websocket_reconnect_attempts:
+                    logger.error("ListenKey 重試次數已達上限，請檢查網絡連接或重啟程序")
+                    return
             
             # 構建新的 WebSocket URL
             ws_url = self.ws_base_url.rstrip('/ws')
@@ -316,14 +353,16 @@ class BinanceAPI:
                 if self.ws_client.sock and self.ws_client.sock.connected:
                     logger.info("重連：WebSocket 連接成功")
                     self._reconnect_attempts = 0  # 重置重連計數器
+                    self._reconnecting = False # 重置重連狀態
                     return
                 time.sleep(1)
+
+            self._reconnecting = False
             
-            logger.error("重連：WebSocket 連接建立超時")
+            logger.error("重連：無法連接 WebSocket，將繼續重試")
             
         except Exception as e:
             logger.error(f"重連：WebSocket 重連過程中發生錯誤: {str(e)}")
-            # 不在這裡拋出異常，讓重連機制繼續工作
 
     def _handle_user_message(self, msg: Dict):
         """處理用戶數據流消息"""
@@ -340,16 +379,21 @@ class BinanceAPI:
                 positions = msg.get('a', {}).get('P', [])
                 for position in positions:
                     if position and isinstance(position, dict):
-                        # 使用 BinanceConverter 轉換倉位數據
-                        position_info = BinanceConverter.to_position({
-                            'e': 'ACCOUNT_UPDATE',
-                            'a': {'P': [position]}
-                        })
-                        
-                        # 調用回調函數
-                        if self.position_callback:
-                            self.position_callback(position_info)
+                        try:
+                            # 使用 BinanceConverter 轉換倉位數據
+                            position_info = BinanceConverter.to_position({
+                                'e': 'ACCOUNT_UPDATE',
+                                'a': {'P': [position]}
+                            })
+
+                            # 調用回調函數
+                            if self.position_callback:
+                                self.position_callback(position_info)
+                            logger.info(f"帳戶更新: {position_info}")
                             
+                        except Exception as e:
+                            logger.error(f"轉換倉位數據失敗: {str(e)}")
+
             elif event_type == 'ORDER_TRADE_UPDATE':
                 # 處理訂單交易更新事件
                 order = msg.get('o', {})
@@ -360,7 +404,12 @@ class BinanceAPI:
                             'e': 'ORDER_TRADE_UPDATE',
                             'o': order
                         })
+
+                        # 調用回調函數
+                        if self.order_callback:
+                            self.order_callback(order_info)
                         logger.info(f"訂單更新: {order_info}")
+
                     except Exception as e:
                         logger.error(f"轉換訂單數據失敗: {str(e)}")
                     
@@ -408,6 +457,7 @@ class BinanceAPI:
             
             # 清除回調函數和 listenKey
             self.position_callback = None
+            self.order_callback = None
             self.listen_key = None
             
             logger.info("倉位監聽器已停止")

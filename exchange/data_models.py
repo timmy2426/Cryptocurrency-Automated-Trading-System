@@ -121,6 +121,7 @@ class Order(OrderBase):
         update_time: 訂單更新時間
         is_working: 是否正在執行
         newOrderRespType: 訂單響應類型
+        execution_type: 執行類型
     """
     # 訂單參數
     price: Optional[Decimal] = None
@@ -151,6 +152,7 @@ class Order(OrderBase):
     update_time: Optional[int] = None
     is_working: Optional[bool] = None
     newOrderRespType: str = "RESULT"
+    execution_type: Optional[str] = None
 
 @dataclass
 class OrderResult:

@@ -29,6 +29,7 @@ class TimeInForce(Enum):
     FOK = "FOK"  # Fill or Kill
     GTX = "GTX"  # Good Till Crossing
     POST_ONLY = "POST_ONLY"  # Post Only
+    GTE_GTC = "GTE_GTC"  # Good Till Expired - Good Till Cancel
 
 class OrderStatus(Enum):
     """訂單狀態"""

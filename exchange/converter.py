@@ -49,7 +49,10 @@ class BinanceConverter:
                     orig_type=OrderType[order_data.get('ot', 'MARKET')],
                     price_match=PriceMatch[order_data.get('pm', 'NONE')],
                     self_trade_prevention_mode=SelfTradePreventionMode[order_data.get('stpm', 'NONE')],
-                    good_till_date=int(order_data.get('gtd', 0))
+                    good_till_date=int(order_data.get('gtd', 0)),
+                    avg_price=Decimal(str(order_data.get('ap', 0))) if order_data.get('ap') != '0' else None,
+                    status=OrderStatus[order_data.get('X', 'NEW')],
+                    execution_type=order_data.get('x', 'NEW')
                 )
             else:
                 # REST API 格式使用完整字段名
@@ -196,30 +199,36 @@ class BinanceConverter:
             raise
 
     @staticmethod
-    def _get_close_reason(position_data: Dict) -> Optional[CloseReason]:
-        """從倉位數據中獲取平倉原因
+    def get_close_reason(order: Order) -> Optional[str]:
+        """從訂單數據中獲取平倉原因
         
         Args:
-            position_data: 倉位數據
+            order: Order 物件，包含訂單信息
             
         Returns:
-            CloseReason: 平倉原因，如果沒有則返回 None
+            str: 平倉原因，如果沒有則返回 None
         """
         try:
-            # 檢查是否有平倉原因字段
-            reason = position_data.get('closeReason') or position_data.get('cr')
-            if not reason:
-                return None
-                
-            # 轉換平倉原因
-            reason_map = {
-                'TAKE_PROFIT': CloseReason.TAKE_PROFIT,
-                'STOP_LOSS': CloseReason.STOP_LOSS,
-                'LIQUIDATION': CloseReason.LIQUIDATION,
-                'MANUAL': CloseReason.MANUAL,
-                'TRAILING_STOP': CloseReason.TRAILING_STOP
-            }
-            return reason_map.get(reason.upper(), None)
+            # 檢查是否為已成交的平倉單
+            if order.status == OrderStatus.FILLED and order.execution_type == 'TRADE':
+                # 根據原始訂單類型判斷
+                if order.orig_type:
+                    if order.orig_type == OrderType.TAKE_PROFIT_MARKET.value:
+                        return CloseReason.TAKE_PROFIT.value
+                    elif order.orig_type == OrderType.STOP_MARKET.value:
+                        return CloseReason.STOP_LOSS.value
+                    elif order.orig_type == OrderType.TRAILING_STOP_MARKET.value:
+                        return CloseReason.TRAILING_STOP.value
+            
+            # 根據執行類型判斷
+            if order.execution_type:
+                if order.execution_type == 'LIQUIDATION':
+                    return CloseReason.LIQUIDATION.value
+                elif order.execution_type == 'EXPIRED':
+                    return CloseReason.MANUAL.value
+            
+            # 如果都無法判斷，則返回手動平倉
+            return CloseReason.MANUAL.value
             
         except Exception as e:
             logger.error(f"獲取平倉原因失敗: {str(e)}")
