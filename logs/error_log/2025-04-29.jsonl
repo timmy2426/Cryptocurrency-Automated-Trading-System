@@ -1,0 +1,4 @@
+{"timestamp": 1745917527804, "error": "argument of type 'NoneType' is not iterable"}
+{"timestamp": 1745917653607, "error": "local variable 'positions' referenced before assignment"}
+{"timestamp": 1745917705347, "error": "argument of type 'NoneType' is not iterable"}
+{"timestamp": 1745918374572, "error": "argument of type 'NoneType' is not iterable"}

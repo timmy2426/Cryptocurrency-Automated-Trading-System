@@ -48,17 +48,17 @@ running = True
 TEST_SYMBOL_BTC = "BTCUSDT"
 TEST_QUANTITY_BTC = Decimal("0.005")  
 TEST_PRICE_BTC = Decimal("84000")
-TEST_TAKE_PROFIT_BTC = Decimal("90000")
+TEST_TAKE_PROFIT_BTC = Decimal("100000")
 TEST_STOP_LOSS_BTC = Decimal("70000")
-TEST_ACTIVATE_PRICE_BTC = Decimal("90000")  # BTC 追蹤止損激活價格
+TEST_ACTIVATE_PRICE_BTC = Decimal("100000")  # BTC 追蹤止損激活價格
 TEST_PRICE_RATE_BTC = Decimal("3")  # BTC 追蹤止損回調率
 
 # ETHUSDT 配置
 TEST_SYMBOL_ETH = "ETHUSDT"
 TEST_QUANTITY_ETH = Decimal("0.05")
-TEST_PRICE_ETH = Decimal("1700")
+TEST_PRICE_ETH = Decimal("1800")
 TEST_TAKE_PROFIT_ETH = Decimal("1200")
-TEST_STOP_LOSS_ETH = Decimal("1800")
+TEST_STOP_LOSS_ETH = Decimal("2000")
 TEST_ACTIVATE_PRICE_ETH = Decimal("1200")  # ETH 追蹤止損激活價格
 TEST_PRICE_RATE_ETH = Decimal("3")  # ETH 追蹤止損回調率
 
@@ -512,7 +512,7 @@ def order_callback(order_info: Dict):
 def start_websocket_listener(api: BinanceAPI):
     """啟動 WebSocket 監聽器"""
     try:
-        api.start_position_listener(position_callback)
+        api.start_position_listener(position_callback, order_callback)
         logger.info("WebSocket 監聽器啟動成功")
     except Exception as e:
         logger.error(f"WebSocket 監聽器啟動失敗: {str(e)}")

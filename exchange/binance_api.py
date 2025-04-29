@@ -196,7 +196,9 @@ class BinanceAPI:
                 if self._reconnecting:
                     logger.warning("已經在重連過程中，忽略新的重連請求")
                     return
-                self._reconnect_websocket()
+                # 在新線程中執行重連
+                reconnect_thread = threading.Thread(target=self._reconnect_websocket, daemon=True)
+                reconnect_thread.start()
             
             def on_open(ws):
                 logger.info("WebSocket 連接已建立")
@@ -402,6 +404,7 @@ class BinanceAPI:
                         # 使用 BinanceConverter 轉換訂單數據
                         order_info = BinanceConverter.to_order({
                             'e': 'ORDER_TRADE_UPDATE',
+                            'T': msg.get('T', time.time()), 
                             'o': order
                         })
 

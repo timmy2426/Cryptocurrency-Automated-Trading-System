@@ -116,8 +116,9 @@ class Order(OrderBase):
         orig_qty: 原始訂單數量
         executed_qty: 已執行數量
         cummulative_quote_qty: 累計成交金額
+        realized_profit: 已實現盈虧
         status: 訂單狀態
-        time: 訂單創建時間
+        timestamp: 訂單創建時間
         update_time: 訂單更新時間
         is_working: 是否正在執行
         newOrderRespType: 訂單響應類型
@@ -147,8 +148,9 @@ class Order(OrderBase):
     orig_qty: Optional[Decimal] = None
     executed_qty: Optional[Decimal] = None
     cummulative_quote_qty: Optional[Decimal] = None
+    realized_profit: Optional[Decimal] = None
     status: Optional[OrderStatus] = None
-    time: Optional[int] = None
+    timestamp: Optional[int] = None
     update_time: Optional[int] = None
     is_working: Optional[bool] = None
     newOrderRespType: str = "RESULT"

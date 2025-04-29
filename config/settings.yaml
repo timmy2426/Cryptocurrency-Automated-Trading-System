@@ -9,18 +9,27 @@ binance_api:
   webSocket_base_endpoint_for_testnet: wss://stream.binancefuture.com
   max_weight_per_minute: 1200
   max_order_per_second: 50
-  ping_interval: 60
-  pong_timeout: 20
-  reconnect_attempts: 5
+  ping_interval: 10
+  pong_timeout: 5
+  reconnect_attempts: 10
   max_order_per_minute: 100
   recv_window: 5000
 
 index:
   bb_length: 20
-  bb_mult: 2
+  bb_mult: 0.5
+  bb_change_rate: 0.001
+  bb_change_rate_window: 10
+  bb_price_threshold: 0.1
   rsi_length: 14
-  ma_slow_length: 100
+  rsi_overbought: 60
+  rsi_oversold: 40
+  rsi_momentum_offset: 20
+  rsi_reversal_offset: 20
+  rsi_average_window: 3
+  ma_slow_length: 50
   atr_period: 14
+  average_volume_window: 300
 
 trading:
   symbol_list:
@@ -29,20 +38,35 @@ trading:
     - SOLUSDT
     - XRPUSDT
     - ADAUSDT
+    - EOSUSDT
+    - BCHUSDT
+    - LTCUSDT
+    - XLMUSDT
+    - TRXUSDT
+    - LINKUSDT
+    - IOTAUSDT
+    - XTZUSDT
+    - BNBUSDT
+    - QTUMUSDT
+    - DOGEUSDT
+    - VETUSDT
+    - ZILUSDT
+    - PUMPUSDT
+    - ONTUSDT
   leverage: 5
   price_protect: true
-  trailing_percent: 1.2
+  activate_price_rate: 0.01
+  trailing_percent: 0.8 #百分比%
   max_loss_percent: 0.012
   mean_reversion_tp: 0.018
   mean_reversion_sl: 0.01
 
 risk_control:
-  risk_per_trade: 0.02
+  risk_per_trade: 0.005
   max_margin_usage: 0.7
-  slippage_percent: 0.005
+  slippage_percent: 0.5 #百分比%
   max_holding_bars: 6
   max_daily_trades: 10
   max_daily_loss: 0.1
   cooldown_period: 3600
-  exit_ratio_list: [0.5, 0.3, 0.2]
-  confirm_candle: 1
+  min_bandwidth_threshold: 0.0001

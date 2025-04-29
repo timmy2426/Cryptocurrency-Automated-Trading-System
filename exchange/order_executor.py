@@ -2,7 +2,7 @@ from binance.error import ClientError
 import logging
 from typing import Optional, List, Dict, Union, Any
 import time
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN
 from datetime import datetime
 
 from .enums import OrderSide, OrderType, NewOrderRespType, OrderStatus, TimeInForce, PositionStatus, CloseReason, WorkingType
@@ -108,11 +108,7 @@ class OrderExecutor:
             raise ValueError(f"交易數量 {quantity} 小於最小允許數量 {lot_size_info['min_qty']}")
         if quantity > lot_size_info['max_qty']:
             raise ValueError(f"交易數量 {quantity} 大於最大允許數量 {lot_size_info['max_qty']}")
-            
-        # 檢查數量是否符合步長要求
-        if (quantity % lot_size_info['step_size']) != 0:
-            raise ValueError(f"交易數量 {quantity} 不符合步長要求 {lot_size_info['step_size']}")
-            
+        
     def _check_price_limits(self, symbol: str, price: Decimal) -> None:
         """
         檢查價格限制
@@ -131,11 +127,7 @@ class OrderExecutor:
             raise ValueError(f"價格 {price} 小於最小允許價格 {price_info['min_price']}")
         if price > price_info['max_price']:
             raise ValueError(f"價格 {price} 大於最大允許價格 {price_info['max_price']}")
-            
-        # 檢查價格是否符合步長要求
-        if (price % price_info['tick_size']) != 0:
-            raise ValueError(f"價格 {price} 不符合步長要求 {price_info['tick_size']}")
-            
+        
     def _check_stop_price_limits(self, symbol: str, stop_price: Decimal) -> None:
         """
         檢查止損價格限制
@@ -154,11 +146,7 @@ class OrderExecutor:
             raise ValueError(f"止損價格 {stop_price} 小於最小允許價格 {price_info['min_price']}")
         if stop_price > price_info['max_price']:
             raise ValueError(f"止損價格 {stop_price} 大於最大允許價格 {price_info['max_price']}")
-            
-        # 檢查止損價格是否符合步長要求
-        if (stop_price % price_info['tick_size']) != 0:
-            raise ValueError(f"止損價格 {stop_price} 不符合步長要求 {price_info['tick_size']}")
-            
+        
     def _check_order_limits(self, order: Order) -> None:
         """
         檢查訂單限制
@@ -211,6 +199,48 @@ class OrderExecutor:
         # 檢查數量相關參數
         if not order.close_position and not order.reduce_only and order.quantity is None:
             raise ValueError("必須指定數量或設置 close_position 或 reduce_only")
+        
+    def _adjust_to_step_or_tick_size(self, value: Decimal, step_or_tick_size: Decimal) -> Decimal:
+        """
+        根據 step_size 調整數量或價格，防止 precision error
+        """
+        return (value // step_or_tick_size) * step_or_tick_size
+        
+    def _adjust_order_precision(self, order: Order) -> Order:
+        """
+        自動調整訂單內的數量、價格、止損價格到交易對允許的小數點範圍
+
+        Args:
+            order: 訂單對象
+                    
+        Returns:
+            Order: 調整後的訂單對象
+        """
+        try:
+            lot_size_info = self.api.get_lot_size_info(order.symbol)
+            price_info = self.api.get_price_filter_info(order.symbol)
+
+            # 數量調整
+            if order.quantity is not None:
+                order.quantity = self._adjust_to_step_or_tick_size(order.quantity, lot_size_info['step_size'])
+
+            # 價格調整
+            if order.price is not None:
+                order.price = self._adjust_to_step_or_tick_size(order.price, price_info['tick_size'])
+
+            # 止損價格調整
+            if order.stop_price is not None:
+                order.stop_price = self._adjust_to_step_or_tick_size(order.stop_price, price_info['tick_size'])
+
+            # 移動止損價格調整
+            if order.activate_price is not None:
+                order.activate_price = self._adjust_to_step_or_tick_size(order.activate_price, price_info['tick_size'])
+            
+            return order
+        
+        except Exception as e:
+            logger.error(f"調整訂單精度失敗: {str(e)}")
+            raise
 
     def open_position_market(self, order: Order) -> OrderResult:
         """市價開倉
@@ -222,8 +252,12 @@ class OrderExecutor:
             OrderResult: 訂單結果
         """
         try:
-            # 設置訂單類型為市價單
-            order.type = OrderType.MARKET
+            # 設置交易配置
+            self._setup_trading_config(order.symbol)
+
+            # 檢查訂單限制
+            self._check_order_limits(order)
+            order = self._adjust_order_precision(order)
             
             # 構建訂單參數
             params = {
@@ -269,6 +303,7 @@ class OrderExecutor:
             
             # 檢查訂單限制
             self._check_order_limits(order)
+            order = self._adjust_order_precision(order)
             
             # 構建訂單參數
             params = {
@@ -318,6 +353,7 @@ class OrderExecutor:
             
             # 檢查訂單限制
             self._check_order_limits(order)
+            order = self._adjust_order_precision(order)
             
             # 構建訂單參數
             params = {
@@ -359,22 +395,23 @@ class OrderExecutor:
             logger.error(f"開止損倉位發生錯誤: {str(e)}")
             raise
 
-    def open_position_trailing(self, order: Order, activate_price: float, price_rate: float) -> OrderResult:
-        """開追蹤止損倉位"""
+    def open_position_trailing(self, order: Order) -> OrderResult:
+        """開移動止損倉位"""
         try:
             # 設置交易配置
             self._setup_trading_config(order.symbol)
             
             # 檢查訂單限制
             self._check_order_limits(order)
+            order = self._adjust_order_precision(order)
             
             # 構建訂單參數
             params = {
                 'symbol': order.symbol,
                 'side': order.side.value,
                 'type': order.type.value,
-                'activationPrice': str(activate_price),
-                'callbackRate': str(price_rate)
+                'activationPrice': order.activate_price,
+                'callbackRate': order.price_rate
             }
             
             # 只在平倉時添加 reduce_only 和 close_position
@@ -409,7 +446,7 @@ class OrderExecutor:
             logger.error(f"開追蹤止損倉位發生錯誤: {str(e)}")
             raise
             
-    def get_order_status(self, symbol: str, order_id: str) -> OrderResult:
+    def get_order_status(self, symbol: str, order_id: int) -> OrderResult:
         """查詢訂單狀態"""
         return self.api.get_order_status(symbol=symbol, order_id=order_id)
         
@@ -597,6 +634,30 @@ class OrderExecutor:
             
         except Exception as e:
             logger.error(f"獲取賬戶信息失敗: {str(e)}")
+            raise
+
+    def get_current_price(self, symbol: str) -> Decimal:
+        """獲取當前價格"""
+        try:
+            return self.api.get_current_price(symbol)
+        except Exception as e:
+            logger.error(f"獲取當前價格失敗: {str(e)}")
+            raise
+
+    def get_order_book(self, symbol: str, limit: int = 100) -> Dict:
+        """獲取訂單簿
+    
+        Args:
+            symbol: 交易對名稱
+            limit: 訂單簿深度，默認為 100
+            
+        Returns:
+            Dict: 訂單簿數據
+        """
+        try:
+            return self.api.get_order_book(symbol, limit)
+        except Exception as e:
+            logger.error(f"獲取訂單簿失敗: {str(e)}")
             raise
 
     def open_position_limit(self, order: Order) -> OrderResult:

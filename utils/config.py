@@ -28,8 +28,6 @@ def check_config_parameters(required_params: List[str]) -> Dict[str, Any]:
                     os.path.join(os.getcwd(), 'config'),
                     # 從項目根目錄查找
                     os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'config'),
-                    # 從 core 模塊所在目錄查找
-                    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config')
                 ]
                 
                 # 檢查所有必要的配置文件
@@ -77,7 +75,7 @@ def check_config_parameters(required_params: List[str]) -> Dict[str, Any]:
         # 檢查每個參數
         for param in required_params:
             # 檢查交易配置參數
-            if param in ['leverage', 'price_protect', 'trailing_percent', 'max_loss_percent', 
+            if param in ['leverage', 'price_protect', 'activate_price_rate', 'trailing_percent', 'max_loss_percent', 
                         'mean_reversion_tp', 'mean_reversion_sl', 'symbol_list']:
                 result[param] = config.get('trading', {}).get(param)
                 
@@ -93,7 +91,9 @@ def check_config_parameters(required_params: List[str]) -> Dict[str, Any]:
                 result[param] = config.get('binance_api', {}).get(param)
                 
             # 檢查指標配置參數
-            elif param in ['bb_length', 'bb_mult', 'rsi_length', 'ma_slow_length', 'atr_period']:
+            elif param in ['bb_length', 'bb_mult', 'bb_change_rate', 'bb_change_rate_window', 'bb_price_threshold', 'rsi_length', 
+                           'rsi_overbought', 'rsi_oversold', 'rsi_momentum_offset', 'rsi_reversal_offset', 
+                           'rsi_average_window', 'ma_slow_length', 'atr_period', 'average_volume_window']:
                 result[param] = config.get('index', {}).get(param)
                 
             # 檢查風險控制參數
@@ -101,7 +101,7 @@ def check_config_parameters(required_params: List[str]) -> Dict[str, Any]:
                           'max_position_size', 'min_position_size', 'max_leverage', 
                           'min_leverage', 'max_daily_trades', 'max_concurrent_trades',
                           'slippage_percent', 'max_holding_bars', 'cooldown_period',
-                          'exit_ratio_list', 'confirm_candle']:
+                          'min_bandwidth_threshold']:
                 result[param] = config.get('risk_control', {}).get(param)
                 
             # 檢查 API 金鑰

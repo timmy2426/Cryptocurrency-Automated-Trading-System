@@ -26,8 +26,9 @@ class BinanceConverter:
         """
         try:
             # 檢查是否為 WebSocket 格式（包含 'o' 字段）
-            if isinstance(order_data, dict) and 'o' in order_data:
+            if isinstance(order_data, dict) and 'o' in order_data and 'T' in order_data:
                 # 如果是 WebSocket 消息，提取訂單數據
+                transaction_time = order_data['T']
                 order_data = order_data['o']
                 return Order(
                     symbol=order_data.get('s', ''),
@@ -51,8 +52,10 @@ class BinanceConverter:
                     self_trade_prevention_mode=SelfTradePreventionMode[order_data.get('stpm', 'NONE')],
                     good_till_date=int(order_data.get('gtd', 0)),
                     avg_price=Decimal(str(order_data.get('ap', 0))) if order_data.get('ap') != '0' else None,
+                    realized_profit=Decimal(str(order_data.get('rp', 0))) if order_data.get('rp') != '0' else None,
                     status=OrderStatus[order_data.get('X', 'NEW')],
-                    execution_type=order_data.get('x', 'NEW')
+                    execution_type=order_data.get('x', 'NEW'),
+                    timestamp=int(transaction_time)
                 )
             else:
                 # REST API 格式使用完整字段名
@@ -209,16 +212,14 @@ class BinanceConverter:
             str: 平倉原因，如果沒有則返回 None
         """
         try:
-            # 檢查是否為已成交的平倉單
-            if order.status == OrderStatus.FILLED and order.execution_type == 'TRADE':
-                # 根據原始訂單類型判斷
-                if order.orig_type:
-                    if order.orig_type == OrderType.TAKE_PROFIT_MARKET.value:
-                        return CloseReason.TAKE_PROFIT.value
-                    elif order.orig_type == OrderType.STOP_MARKET.value:
-                        return CloseReason.STOP_LOSS.value
-                    elif order.orig_type == OrderType.TRAILING_STOP_MARKET.value:
-                        return CloseReason.TRAILING_STOP.value
+            # 根據原始訂單類型判斷
+            if order.orig_type:
+                if order.orig_type == OrderType.TAKE_PROFIT_MARKET:
+                    return CloseReason.TAKE_PROFIT.value
+                elif order.orig_type == OrderType.STOP_MARKET:
+                    return CloseReason.STOP_LOSS.value
+                elif order.orig_type == OrderType.TRAILING_STOP_MARKET:
+                    return CloseReason.TRAILING_STOP.value
             
             # 根據執行類型判斷
             if order.execution_type:
@@ -245,48 +246,48 @@ class BinanceConverter:
             AccountInfo: 轉換後的帳戶信息對象
         """
         return AccountInfo(
-            total_wallet_balance=float(account_data.get('totalWalletBalance', 0)),
-            total_unrealized_profit=float(account_data.get('totalUnrealizedProfit', 0)),
-            total_margin_balance=float(account_data.get('totalMarginBalance', 0)),
-            total_position_initial_margin=float(account_data.get('totalPositionInitialMargin', 0)),
-            total_open_order_initial_margin=float(account_data.get('totalOpenOrderInitialMargin', 0)),
-            total_cross_wallet_balance=float(account_data.get('totalCrossWalletBalance', 0)),
-            available_balance=float(account_data.get('availableBalance', 0)),
-            max_withdraw_amount=float(account_data.get('maxWithdrawAmount', 0)),
-            total_initial_margin=float(account_data.get('totalInitialMargin', 0)),
-            total_maint_margin=float(account_data.get('totalMaintMargin', 0)),
-            total_cross_un_pnl=float(account_data.get('totalCrossUnPnl', 0)),
+            total_wallet_balance=Decimal(str(account_data.get('totalWalletBalance', 0))),
+            total_unrealized_profit=Decimal(str(account_data.get('totalUnrealizedProfit', 0))),
+            total_margin_balance=Decimal(str(account_data.get('totalMarginBalance', 0))),
+            total_position_initial_margin=Decimal(str(account_data.get('totalPositionInitialMargin', 0))),
+            total_open_order_initial_margin=Decimal(str(account_data.get('totalOpenOrderInitialMargin', 0))),
+            total_cross_wallet_balance=Decimal(str(account_data.get('totalCrossWalletBalance', 0))),
+            available_balance=Decimal(str(account_data.get('availableBalance', 0))),
+            max_withdraw_amount=Decimal(str(account_data.get('maxWithdrawAmount', 0))),
+            total_initial_margin=Decimal(str(account_data.get('totalInitialMargin', 0))),
+            total_maint_margin=Decimal(str(account_data.get('totalMaintMargin', 0))),
+            total_cross_un_pnl=Decimal(str(account_data.get('totalCrossUnPnl', 0))),
             assets=[{
                 'asset': asset.get('asset', ''),
-                'wallet_balance': float(asset.get('walletBalance', 0)),
-                'unrealized_profit': float(asset.get('unrealizedProfit', 0)),
-                'margin_balance': float(asset.get('marginBalance', 0)),
-                'maint_margin': float(asset.get('maintMargin', 0)),
-                'initial_margin': float(asset.get('initialMargin', 0)),
-                'position_initial_margin': float(asset.get('positionInitialMargin', 0)),
-                'open_order_initial_margin': float(asset.get('openOrderInitialMargin', 0)),
-                'cross_wallet_balance': float(asset.get('crossWalletBalance', 0)),
-                'cross_un_pnl': float(asset.get('crossUnPnl', 0)),
-                'available_balance': float(asset.get('availableBalance', 0)),
-                'max_withdraw_amount': float(asset.get('maxWithdrawAmount', 0)),
+                'wallet_balance': Decimal(str(asset.get('walletBalance', 0))),
+                'unrealized_profit': Decimal(str(asset.get('unrealizedProfit', 0))),
+                'margin_balance': Decimal(str(asset.get('marginBalance', 0))),
+                'maint_margin': Decimal(str(asset.get('maintMargin', 0))),
+                'initial_margin': Decimal(str(asset.get('initialMargin', 0))),
+                'position_initial_margin': Decimal(str(asset.get('positionInitialMargin', 0))),
+                'open_order_initial_margin': Decimal(str(asset.get('openOrderInitialMargin', 0))),
+                'cross_wallet_balance': Decimal(str(asset.get('crossWalletBalance', 0))),
+                'cross_un_pnl': Decimal(str(asset.get('crossUnPnl', 0))),
+                'available_balance': Decimal(str(asset.get('availableBalance', 0))),
+                'max_withdraw_amount': Decimal(str(asset.get('maxWithdrawAmount', 0))),
                 'margin_available': bool(asset.get('marginAvailable', False)),
                 'update_time': int(time.time() * 1000)
             } for asset in account_data.get('assets', [])],
             positions=[{
                 'symbol': position.get('symbol', ''),
-                'initial_margin': float(position.get('initialMargin', 0)),
-                'maint_margin': float(position.get('maintMargin', 0)),
-                'unrealized_profit': float(position.get('unrealizedProfit', 0)),
-                'position_initial_margin': float(position.get('positionInitialMargin', 0)),
-                'open_order_initial_margin': float(position.get('openOrderInitialMargin', 0)),
+                'initial_margin': Decimal(str(position.get('initialMargin', 0))),
+                'maint_margin': Decimal(str(position.get('maintMargin', 0))),
+                'unrealized_profit': Decimal(str(position.get('unrealizedProfit', 0))),
+                'position_initial_margin': Decimal(str(position.get('positionInitialMargin', 0))),
+                'open_order_initial_margin': Decimal(str(position.get('openOrderInitialMargin', 0))),
                 'leverage': int(position.get('leverage', 1)),
                 'isolated': bool(position.get('isolated', False)),
-                'entry_price': float(position.get('entryPrice', 0)),
-                'max_notional': float(position.get('maxNotional', 0)),
+                'entry_price': Decimal(str(position.get('entryPrice', 0))),
+                'max_notional': Decimal(str(position.get('maxNotional', 0))),
                 'position_side': position.get('positionSide', 'BOTH'),
-                'position_amt': float(position.get('positionAmt', 0)),
-                'notional': float(position.get('notional', 0)),
-                'isolated_wallet': float(position.get('isolatedWallet', 0)),
+                'position_amt': Decimal(str(position.get('positionAmt', 0))),
+                'notional': Decimal(str(position.get('notional', 0))),
+                'isolated_wallet': Decimal(str(position.get('isolatedWallet', 0))),
                 'update_time': int(time.time() * 1000)
             } for position in account_data.get('positions', [])],
             update_time=int(time.time() * 1000)
