@@ -98,10 +98,8 @@ def check_config_parameters(required_params: List[str]) -> Dict[str, Any]:
                 
             # 檢查風險控制參數
             elif param in ['risk_per_trade', 'max_margin_usage', 'max_daily_loss', 
-                          'max_position_size', 'min_position_size', 'max_leverage', 
-                          'min_leverage', 'max_daily_trades', 'max_concurrent_trades',
-                          'slippage_percent', 'max_holding_bars', 'cooldown_period',
-                          'min_bandwidth_threshold']:
+                          'max_daily_trades', 'slippage_percent', 'max_holding_bars',
+                          'consecutive_losses', 'cooldown_period', 'min_bandwidth_threshold']:
                 result[param] = config.get('risk_control', {}).get(param)
                 
             # 檢查 API 金鑰

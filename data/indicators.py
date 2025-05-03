@@ -118,8 +118,8 @@ class TechnicalIndicators:
         """
         try:
             # 計算價格與上下軌的距離百分比
-            upper_distance = (upper_band - price) / price
-            lower_distance = (price - lower_band) / price
+            upper_distance = abs(price - upper_band) / upper_band
+            lower_distance = abs(price - lower_band) / lower_band
             
             # 判斷是否在閾值範圍內
             near_upper = upper_distance <= self.config['bb_price_threshold']

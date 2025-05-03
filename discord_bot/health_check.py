@@ -55,6 +55,8 @@ class HealthCheck:
             status=account_info['status'],
             environment=account_info['environment'],
             account_equity=account_info['account_equity'],
+            daily_trades=account_info['daily_trades'],
+            daily_pnl=account_info['daily_pnl'],
             unrealized_pnl=account_info['unrealized_pnl'],
             unrealized_pnl_percentage=account_info['unrealized_pnl_percentage'],
             positions=account_info['positions']
@@ -107,6 +109,8 @@ class HealthCheck:
                 status=account_info['status'],
                 environment=account_info['environment'],
                 account_equity=account_info['account_equity'],
+                daily_trades=account_info['daily_trades'],
+                daily_pnl=account_info['daily_pnl'],
                 unrealized_pnl=account_info['unrealized_pnl'],
                 unrealized_pnl_percentage=account_info['unrealized_pnl_percentage'],
                 positions=account_info['positions']

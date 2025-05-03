@@ -1,4 +1,5 @@
 import logging
+from threading import Lock
 from typing import Dict, Optional, List, Any, Union, Callable
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, time as dt_time
@@ -27,8 +28,8 @@ class PositionManager:
     """倉位管理器"""
     
     def __init__(self, order_executor: OrderExecutor, 
-                 message_formatter: 'MessageFormatter' = None,
-                 send_message: 'SendMessage' = None):
+                message_formatter: 'MessageFormatter' = None,
+                send_message: 'SendMessage' = None):
         """
         初始化倉位管理器
         
@@ -41,17 +42,18 @@ class PositionManager:
         self.message_formatter = message_formatter
         self.send_message = send_message
         self.event_logger = EventLogger()
+        self.lock = Lock()
         self.consecutive_losses = 0  # 連續虧損次數
         self.cooldown_start_time = 0  # 冷卻期開始時間
         self.is_cooldown_activate = False  # 冷卻期是否激活
-        self.daily_loss = Decimal('0')  # 單日累計虧損
-        self.daily_trades = 0  # 單日累計開倉次數
         
         # 初始化帳戶信息字典
         self.account_info = {
             'status': None,
             'environment': None,
             'account_equity': Decimal('0'),
+            'daily_trades': 0,
+            'daily_pnl': Decimal('0'),
             'unrealized_pnl': Decimal('0'),
             'unrealized_pnl_percentage': Decimal('0'),
             'positions': []
@@ -64,18 +66,21 @@ class PositionManager:
             'strategy': None,
             'open_time': None,
             'close_time': None,
-            'open_price': None,
-            'close_price': None,
+            'open_price': Decimal('0'),
+            'open_amt': Decimal('0'),
+            'open_size': Decimal('0'),
+            'close_price': Decimal('0'),
+            'close_amt': Decimal('0'),
+            'close_size': Decimal('0'),
             'close_reason': None,
-            'position_amt': Decimal('0'),
-            'position_size': Decimal('0'),
             'stop_loss': None,
             'take_profit': None,
             'trailing_stop': None,
             'price_rate': None,
             'pnl': Decimal('0'),
             'pnl_percentage': Decimal('0'),
-            'open_message_sent': False
+            'is_open_message_sent': False,
+            'is_close_message_sent': False
         }
         
         # 初始化倉位信息字典
@@ -97,6 +102,7 @@ class PositionManager:
                 'max_margin_usage',
                 'max_daily_loss',
                 'max_daily_trades',
+                'consecutive_losses',
                 'cooldown_period',
                 'max_holding_bars',
                 'risk_per_trade',
@@ -130,10 +136,21 @@ class PositionManager:
         
         # 如果當前日期大於上次重置的日期，進行重置
         if now.date() > last_reset_date:
-            self.daily_loss = Decimal('0')
-            self.daily_trades = 0
+            self.account_info['daily_pnl'] = Decimal('0')
+            self.account_info['daily_trades'] = 0
             self.last_reset_time = midnight_timestamp
             logger.info("重置單日累計數據")
+
+    def _match_precision(self, value: Decimal, reference: Decimal) -> Decimal:
+        """
+        將 value 的小數精度調整為 reference 的精度
+        """
+        ref_str = format(reference, 'f')  # 避免科學記號
+        if '.' in ref_str:
+            precision = Decimal('1e-{}'.format(len(ref_str.split('.')[-1])))
+            return value.quantize(precision, rounding=ROUND_HALF_UP)
+        else:
+            return value.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
     def update_account_info(self, update_config: Optional[Dict[str, Any]] = None) -> None:
         """
@@ -159,7 +176,10 @@ class PositionManager:
                     self.account_info['environment'] = update_config['environment']
                 
             # 更新帳戶權益
-            self.account_info['account_equity'] = account_info.total_wallet_balance
+            self.account_info['account_equity'] = account_info.total_wallet_balance.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+            # 更新單日累計盈虧
+            self.account_info['daily_pnl'] = self.account_info['daily_pnl'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             
             # 更新未實現盈虧
             self.account_info['unrealized_pnl'] = account_info.total_unrealized_profit.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
@@ -203,16 +223,15 @@ class PositionManager:
 
     def update_position_info(
         self, 
-        position_data: Union[PositionInfo, OrderResult, Order],
+        position_data: Union[OrderResult, Order],
         update_config: Optional[Dict[str, Any]] = None
     ) -> None:
         """
         更新倉位信息
         
         Args:
-            position_data: PositionInfo、OrderResult 或 Order 對象，包含倉位信息
-            update_config: 更新配置字典，包含以下可選鍵：
-                - strategy: 策略名稱
+            position_data: OrderResult 或 Order 對象，包含倉位信息
+            update_config: 更新配置字典
         """
         try:
             # 獲取交易對
@@ -225,26 +244,40 @@ class PositionManager:
             if symbol not in self.positions:
                 self.positions[symbol] = self._position_template.copy()  # 使用模板創建新的字典
                 self.positions[symbol]['symbol'] = symbol  # 更新交易對
-                
-            # 更新倉位信息
-            if isinstance(position_data, PositionInfo):
-                # 更新倉位大小
-                if position_data.position_amt != 0:
-                    self.positions[symbol]['position_amt'] = position_data.position_amt
-                    self.positions[symbol]['position_size'] = position_data.position_amt * position_data.entry_price
 
             # 更新訂單結果
-            elif isinstance(position_data, Order):
-                
-                if position_data.reduce_only == True or position_data.close_position == True: # 平倉單成交
-                    self.positions[symbol]['close_price'] = position_data.avg_price
-                    self.positions[symbol]['pnl'] = position_data.realized_profit
+            if isinstance(position_data, Order) and position_data.status != OrderStatus.NEW:
+                if position_data.reduce_only  or position_data.close_position: # 平倉單成交
+                    self.positions[symbol]['side'] = position_data.side.value
                     self.positions[symbol]['close_time'] = position_data.timestamp
                     self.positions[symbol]['close_reason'] = BinanceConverter.get_close_reason(position_data)
+                    if self.positions[symbol]['close_price'] == Decimal('0'):
+                        self.positions[symbol]['close_price'] = position_data.avg_price
+                        self.positions[symbol]['close_amt'] = position_data.last_filled_qty
+                    elif abs(position_data.executed_qty) > abs(self.positions[symbol]['close_amt']):
+                        total_cost = self.positions[symbol]['close_price'] * self.positions[symbol]['close_amt'] + position_data.avg_price * position_data.last_filled_qty
+                        self.positions[symbol]['close_amt'] += position_data.last_filled_qty
+                        self.positions[symbol]['close_price'] = self._match_precision(total_cost / self.positions[symbol]['close_amt'], position_data.avg_price)
+                    self.positions[symbol]['close_size'] = self._match_precision(self.positions[symbol]['close_amt'] * self.positions[symbol]['close_price'], position_data.last_filled_qty)
+                    self.positions[symbol]['close_size'] *= Decimal('-1') if self.positions[symbol]['side'] == 'SELL' else Decimal('1')
+                    self.positions[symbol]['pnl'] += position_data.realized_profit
+                    if self.positions[symbol]['close_size'] != Decimal('0') and self.positions[symbol]['pnl'] != Decimal('0'):
+                        self.positions[symbol]['pnl_percentage'] = (
+                            (self.positions[symbol]['pnl'] / abs(self.positions[symbol]['close_size'])) * Decimal('100')
+                            ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    
                 else: # 開倉單成交
                     self.positions[symbol]['side'] = position_data.side.value
-                    self.positions[symbol]['open_price'] = position_data.avg_price
                     self.positions[symbol]['open_time'] = position_data.timestamp
+                    if self.positions[symbol]['open_price'] == Decimal('0'):
+                        self.positions[symbol]['open_price'] = position_data.avg_price
+                        self.positions[symbol]['open_amt'] = position_data.last_filled_qty
+                    else:
+                        total_cost = self.positions[symbol]['open_price'] * self.positions[symbol]['open_amt'] + position_data.avg_price * position_data.last_filled_qty
+                        self.positions[symbol]['open_amt'] += position_data.last_filled_qty
+                        self.positions[symbol]['open_price'] = self._match_precision(total_cost / self.positions[symbol]['open_amt'], position_data.avg_price)
+                    self.positions[symbol]['open_size'] = self._match_precision(self.positions[symbol]['open_amt'] * self.positions[symbol]['open_price'], position_data.last_filled_qty)
+                    self.positions[symbol]['open_size'] *= Decimal('-1') if self.positions[symbol]['side'] == 'SELL' else Decimal('1')
 
             # 更新開倉信息
             if update_config and 'strategy' in update_config:
@@ -257,17 +290,23 @@ class PositionManager:
                 self.positions[symbol]['trailing_stop'] = update_config['trailing_stop']
             if update_config and 'price_rate' in update_config:
                 self.positions[symbol]['price_rate'] = update_config['price_rate']
-                
-            # 計算盈虧率
-            if self.positions[symbol]['position_size'] != Decimal('0') and self.positions[symbol]['pnl'] != Decimal('0'):
-                self.positions[symbol]['pnl_percentage'] = (
-                    (self.positions[symbol]['pnl'] / abs(self.positions[symbol]['position_size'])) * Decimal('100')
-                    ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                
+
             logger.info(f"更新倉位信息成功: {symbol}")
-            logger.info(f"更新倉位信息後的倉位信息: {self.positions[symbol]}")
-            logger.info(f"更新倉位信息後的所有倉位資料: {self.positions}")
-            
+            logger.info(f"倉位信息: {self.positions[symbol]}")
+                
+            # 判斷開倉/平倉是否完成
+            if position_data.status == OrderStatus.FILLED:
+                if position_data.reduce_only or position_data.close_position:
+                    self.close_position_complete(symbol)
+                else:
+                    self.open_position_complete(symbol)
+            elif position_data.status in [OrderStatus.CANCELED, OrderStatus.EXPIRED]:
+                if position_data.executed_qty != Decimal('0'):
+                    if position_data.reduce_only or position_data.close_position:
+                        self.close_position_complete(symbol)
+                    else:
+                        self.open_position_complete(symbol)
+        
         except Exception as e:
             logger.error(f"更新倉位信息失敗: {str(e)}")
             raise
@@ -313,9 +352,9 @@ class PositionManager:
             logger.error(f"刪除倉位信息失敗: {str(e)}")
             raise
 
-    def position_update_complete(self, symbol: str) -> None:
+    def open_position_complete(self, symbol: str) -> None:
         """
-        倉位更新完成
+        開倉完成
         
         Args:
             symbol: 交易對
@@ -326,180 +365,138 @@ class PositionManager:
                 logger.error(f"交易對 {symbol} 不存在")
                 return
             
-            current_time = int(time.time() * 1000)
-            
-            # 檢查倉位資料是否完整
-            if (self.positions[symbol]['side'] != None and
-                self.positions[symbol]['strategy'] != None and
-                self.positions[symbol]['open_time'] != None and
-                self.positions[symbol]['open_price'] != Decimal('0') and
-                self.positions[symbol]['position_size'] != Decimal('0') and ((
-                    self.positions[symbol]['stop_loss'] != None and
-                    self.positions[symbol]['trailing_stop'] != None and
-                    self.positions[symbol]['price_rate'] != None
-                ) or (
-                    self.positions[symbol]['stop_loss'] != None and
-                    self.positions[symbol]['take_profit'] != None
-                ))):
-
-                if (self.positions[symbol]['close_time'] != None and
-                    self.positions[symbol]['close_price'] != Decimal('0') and
-                    self.positions[symbol]['close_reason'] != None and
-                    self.positions[symbol]['pnl'] != Decimal('0')
-                    ):
-                    # 平倉資料更新完成，計算盈虧率
-                    if self.positions[symbol]['position_size'] != Decimal('0') and self.positions[symbol]['pnl'] != Decimal('0'):
-                        self.positions[symbol]['pnl_percentage'] = (
-                        (self.positions[symbol]['pnl'] / abs(self.positions[symbol]['position_size'])) * Decimal('100')
-                        ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-
-                    # 檢查是否為虧損平倉
-                    if self.positions[symbol]['pnl'] < 0:
-                        self.consecutive_losses += 1
-                        self.daily_loss += self.positions[symbol]['pnl']
-                        if self.consecutive_losses >= 3:
-                            self.cooldown_start_time = current_time
-                            self.is_cooldown_activate = True
-                    else:
-                        self.consecutive_losses = 0
-
-                    # 創建平倉消息
-                    embed = self.message_formatter.create_close_position_message(
-                        symbol=self.positions[symbol]['symbol'],
-                        side=self.positions[symbol]['side'],
-                        strategy=self.positions[symbol]['strategy'],
-                        open_time=self.positions[symbol]['open_time'],
-                        close_time=self.positions[symbol]['close_time'],
-                        open_price=self.positions[symbol]['open_price'],
-                        close_price=self.positions[symbol]['close_price'],
-                        close_reason=self.positions[symbol]['close_reason'],
-                        position_size=self.positions[symbol]['position_size'],
-                        pnl=self.positions[symbol]['pnl'],
-                        pnl_percentage=self.positions[symbol]['pnl_percentage']
-                    )
+            with self.lock:
+                if self.positions[symbol]['is_open_message_sent'] == True:
+                    logger.info(f"交易對 {symbol} 已發送開倉消息，無需重複發送")
+                    return
                     
-                    # 發送平倉消息
-                    self.send_message.send_close_position_message(embed)
-                    logger.info(f"成功發送交易對 {symbol} 的平倉消息")
+                # 更新每日開倉數量
+                self.account_info['daily_trades'] += 1
 
-                    # 使用 EventLogger 記錄倉位信息
-                    self.event_logger.trade_log(self.positions[symbol])
-                    logger.info(f"成功記錄交易對 {symbol} 的倉位信息")
+                # 創建開倉消息
+                embed = self.message_formatter.create_open_position_message(
+                    symbol=self.positions[symbol]['symbol'],
+                    side=self.positions[symbol]['side'],
+                    strategy=self.positions[symbol]['strategy'],
+                    open_time=self.positions[symbol]['open_time'],
+                    open_price=self.positions[symbol]['open_price'],
+                    position_size=self.positions[symbol]['open_size'],
+                    stop_loss=self.positions[symbol].get('stop_loss'),
+                    take_profit=self.positions[symbol].get('take_profit'),
+                    trailing_stop=self.positions[symbol].get('trailing_stop'),
+                    price_rate=self.positions[symbol].get('price_rate')
+                )
+                
+                # 發送開倉消息
+                self.send_message.send_open_position_message(embed)
+                logger.info(f"成功發送交易對 {symbol} 的開倉消息")
 
-                    # 取消該交易對的所有未成交訂單
-                    canceled_orders = self.order_executor.cancel_all_orders(symbol)
-                    logger.info(f"取消 {symbol} 的未成交訂單: {len(canceled_orders)} 個")
+                # 設置開倉消息已發送標記
+                self.positions[symbol]['is_open_message_sent'] = True
 
-                    # 刪除倉位信息
-                    self.delete_position_info(symbol)
-                    logger.info(f"成功刪除交易對 {symbol} 的倉位信息")
-
-                elif self.positions[symbol]['open_message_sent'] == False:
-                # 開倉資料更新完成
-
-                    # 更新每日開倉數量
-                    self.daily_trades += 1
-
-                    # 創建開倉消息
-                    embed = self.message_formatter.create_open_position_message(
-                        symbol=self.positions[symbol]['symbol'],
-                        side=self.positions[symbol]['side'],
-                        strategy=self.positions[symbol]['strategy'],
-                        open_time=self.positions[symbol]['open_time'],
-                        open_price=self.positions[symbol]['open_price'],
-                        position_size=self.positions[symbol]['position_size'],
-                        stop_loss=self.positions[symbol].get('stop_loss'),
-                        take_profit=self.positions[symbol].get('take_profit'),
-                        trailing_stop=self.positions[symbol].get('trailing_stop'),
-                        price_rate=self.positions[symbol].get('price_rate')
-                    )
-                    
-                    # 發送開倉消息
-                    self.send_message.send_open_position_message(embed)
-                    logger.info(f"成功發送交易對 {symbol} 的開倉消息")
-
-                    # 設置開倉消息已發送
-                    self.positions[symbol]['open_message_sent'] = True
-                    
         except Exception as e:
-            logger.error(f"倉位更新失敗: {str(e)}")
+            logger.error(f"開倉完成失敗: {str(e)}")
             raise
 
-
-    def position_callback(self, position_info: PositionInfo) -> None:
+    def close_position_complete(self, symbol: str) -> None:
         """
-        倉位更新回調函數
-        
-        Args:
-            position_info: PositionInfo 對象，包含倉位信息
-        """
-        try:
-            symbol = position_info.symbol
-            position_amt = position_info.position_amt
-            current_time = int(time.time() * 1000)
-
-            # 更新倉位信息
-            self.update_position_info(position_info)
-            self.position_update_complete(symbol)
-        
-        except Exception as e:
-            logger.error(f"更新倉位信息失敗: {str(e)}")
-            raise
-
-    def order_setup_complete(self, symbol: str) -> None:
-        """
-        所有訂單設定完成
+        平倉完成
         
         Args:
             symbol: 交易對
         """
         try:
-            # 查詢倉位信息
-            position_info = self.check_position_info(symbol)
-            if not position_info:
-                logger.warning(f"無法獲取交易對 {symbol} 的倉位信息")
+            # 檢查交易對是否存在
+            if symbol not in self.positions:
+                logger.error(f"交易對 {symbol} 不存在")
                 return
+            
+            with self.lock:
+                if self.positions[symbol]['is_close_message_sent'] == True:
+                    logger.info(f"交易對 {symbol} 已發送平倉消息，無需重複發送")
+                    return
                 
-            # 創建開倉消息
-            embed = self.message_formatter.create_open_position_message(
-                symbol=position_info['symbol'],
-                side=position_info['side'],
-                strategy=position_info['strategy'],
-                open_time=position_info['open_time'],
-                open_price=position_info['open_price'],
-                position_size=position_info['position_size'],
-                stop_loss=position_info.get('stop_loss'),
-                take_profit=position_info.get('take_profit'),
-                trailing_stop=position_info.get('trailing_stop'),
-                price_rate=position_info.get('price_rate')
-            )
-            
-            # 發送開倉消息
-            self.send_message.send_open_position_message(embed)
-            logger.info(f"成功發送交易對 {symbol} 的開倉消息")
-            
-        except Exception as e:
-            logger.error(f"完成訂單設定失敗: {str(e)}")
-            raise
+                current_time = int(time.time() * 1000)
 
+                # 檢查是否為虧損平倉
+                if self.positions[symbol]['pnl'] < 0:
+                    self.consecutive_losses += 1
+                    self.account_info['daily_pnl'] += self.positions[symbol]['pnl']
+                    if self.consecutive_losses >= self.config['consecutive_losses']:
+                        self.cooldown_start_time = current_time
+                        self.is_cooldown_activate = True
+                        logger.info(f"連續虧損達到 {self.config['consecutive_losses']} 次，進入冷卻期")
+                else:
+                    self.consecutive_losses = 0
+
+                # 創建平倉消息
+                embed = self.message_formatter.create_close_position_message(
+                    symbol=self.positions[symbol]['symbol'],
+                    side=self.positions[symbol]['side'],
+                    strategy=self.positions[symbol]['strategy'],
+                    open_time=self.positions[symbol]['open_time'],
+                    close_time=self.positions[symbol]['close_time'],
+                    open_price=self.positions[symbol]['open_price'],
+                    close_price=self.positions[symbol]['close_price'],
+                    close_reason=self.positions[symbol]['close_reason'],
+                    position_size=self.positions[symbol]['close_size'],
+                    pnl=self.positions[symbol]['pnl'],
+                    pnl_percentage=self.positions[symbol]['pnl_percentage']
+                )
+                
+                # 發送平倉消息
+                self.send_message.send_close_position_message(embed)
+                logger.info(f"成功發送交易對 {symbol} 的平倉消息")
+
+                # 設置平倉消息已發送標記
+                self.positions[symbol]['is_close_message_sent'] = True
+
+                # 使用 EventLogger 記錄倉位信息
+                self.event_logger.trade_log(self.positions[symbol])
+                logger.info(f"成功記錄交易對 {symbol} 的倉位信息")
+
+                # 取消該交易對的所有未成交訂單
+                canceled_orders = self.order_executor.cancel_all_orders(symbol)
+                logger.info(f"取消 {symbol} 的未成交訂單: {len(canceled_orders)} 個")
+
+                # 刪除倉位信息
+                self.delete_position_info(symbol)
+
+        except Exception as e:
+            logger.error(f"平倉完成失敗: {str(e)}")
+            raise
+    """
+    def position_callback(self, position_info: PositionInfo) -> None:
+        
+        倉位更新回調函數
+        
+        Args:
+            position_info: PositionInfo 對象，包含倉位信息
+        
+        try:
+            return position_info
+
+        except Exception as e:
+            logger.error(f"處理倉位更新失敗: {str(e)}")
+            raise
+    
     def order_callback(self, order_info: Order) -> None:
-        """
+        
         訂單更新回調函數
         
         Args:
             order_info: Order 對象，包含訂單信息
-        """
+        
         try:
             # 檢查訂單是否成交
-            if order_info.status == OrderStatus.FILLED:
-
+            if order_info.status == OrderStatus.FILLED or order_info.status == OrderStatus.PARTIALLY_FILLED:
                 # 更新倉位信息
                 self.update_position_info(order_info)
-                self.position_update_complete(order_info.symbol)
         
         except Exception as e:
             logger.error(f"處理訂單更新失敗: {str(e)}")
             raise
+    """
 
     def check_margin_usage(self) -> bool:
         """
@@ -529,8 +526,8 @@ class PositionManager:
             max_daily_loss = self.account_info['account_equity'] * Decimal(str(self.config['max_daily_loss']))
         
             # 檢查單日累計虧損金額
-            if self.daily_loss < -max_daily_loss:
-                logger.warning(f"單日累計虧損超過限制: {self.daily_loss}")
+            if self.account_info['daily_pnl'] < -max_daily_loss:
+                logger.warning(f"單日累計虧損超過限制: {self.account_info['daily_pnl']}")
                 return False
                 
             return True
@@ -548,7 +545,7 @@ class PositionManager:
         """
         try:
             self._reset_daily_data()
-            return self.daily_trades < self.config['max_daily_trades']
+            return self.account_info['daily_trades'] < self.config['max_daily_trades']
         except Exception as e:
             logger.error(f"檢查單日累計開倉數量失敗: {str(e)}")
             return False
@@ -569,6 +566,7 @@ class PositionManager:
                     self.consecutive_losses = 0
                     self.cooldown_start_time = 0
                     self.is_cooldown_activate = False
+                    logger.info(f"冷卻期結束")
             return True
         except Exception as e:
             logger.error(f"檢查冷卻期失敗: {str(e)}")

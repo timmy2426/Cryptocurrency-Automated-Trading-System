@@ -79,7 +79,6 @@ class BinanceAPI:
             self.client.timeout = config_params['recv_window']
             
             # 初始化 WebSocket 相關屬性
-            self.position_callback = None
             self.order_callback = None
             self._keepalive_running = False
             self._keepalive_thread = None
@@ -91,6 +90,8 @@ class BinanceAPI:
             
             # 啟用 WebSocket 調試日誌
             websocket.enableTrace(True)
+            websocket_logger = logging.getLogger('websocket')
+            websocket_logger.setLevel(logging.DEBUG)
             
             logger.info(f"已初始化 Binance API（{'測試網' if config_params['testnet'] else '主網'}）")
             logger.info(f"WebSocket 基礎 URL: {self.ws_base_url}")
@@ -147,11 +148,7 @@ class BinanceAPI:
         self._keepalive_thread.start()
         logger.info("已啟動 listenKey 保活任務")
 
-    def start_position_listener(
-        self, 
-        position_callback: Callable[[PositionInfo], None],
-        order_callback: Callable[[Order], None]
-    ) -> None:
+    def start_position_listener(self, order_callback: Callable[[Order], None]) -> None:
         """啟動倉位監聽器"""
         try:
             # 檢查 WebSocket 客戶端狀態
@@ -160,10 +157,9 @@ class BinanceAPI:
                 return
                 
             # 檢查回調函數
-            if not callable(position_callback) or not callable(order_callback):
+            if not callable(order_callback):
                 raise ValueError("回調函數必須是可調用的")
                 
-            self.position_callback = position_callback
             self.order_callback = order_callback
             
             # 先獲取 listenKey
@@ -381,20 +377,8 @@ class BinanceAPI:
                 positions = msg.get('a', {}).get('P', [])
                 for position in positions:
                     if position and isinstance(position, dict):
-                        try:
-                            # 使用 BinanceConverter 轉換倉位數據
-                            position_info = BinanceConverter.to_position({
-                                'e': 'ACCOUNT_UPDATE',
-                                'a': {'P': [position]}
-                            })
-
-                            # 調用回調函數
-                            if self.position_callback:
-                                self.position_callback(position_info)
-                            logger.info(f"帳戶更新: {position_info}")
-                            
-                        except Exception as e:
-                            logger.error(f"轉換倉位數據失敗: {str(e)}")
+                        logger.info(f"倉位更新: {position}")
+                        # 這裡可以添加倉位更新的處理邏輯
 
             elif event_type == 'ORDER_TRADE_UPDATE':
                 # 處理訂單交易更新事件
@@ -459,7 +443,6 @@ class BinanceAPI:
                 self.ws_client = None
             
             # 清除回調函數和 listenKey
-            self.position_callback = None
             self.order_callback = None
             self.listen_key = None
             

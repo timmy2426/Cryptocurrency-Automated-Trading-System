@@ -52,6 +52,8 @@ class BinanceConverter:
                     self_trade_prevention_mode=SelfTradePreventionMode[order_data.get('stpm', 'NONE')],
                     good_till_date=int(order_data.get('gtd', 0)),
                     avg_price=Decimal(str(order_data.get('ap', 0))) if order_data.get('ap') != '0' else None,
+                    last_filled_qty=Decimal(str(order_data.get('l', 0))) if order_data.get('l') != '0' else None,
+                    executed_qty=Decimal(str(order_data.get('z', 0))) if order_data.get('z') != '0' else None,
                     realized_profit=Decimal(str(order_data.get('rp', 0))) if order_data.get('rp') != '0' else None,
                     status=OrderStatus[order_data.get('X', 'NEW')],
                     execution_type=order_data.get('x', 'NEW'),

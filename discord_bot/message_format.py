@@ -67,14 +67,14 @@ class MessageFormatter:
         # 添加字段
         embed.add_embed_field(name="交易對", value=symbol, inline=False)
         embed.add_embed_field(name="交易方向", value=self._str_content_translate(side) if side is not None else "null", inline=False)
-        embed.add_embed_field(name="交易策略", value=self._str_content_translate(strategy) if strategy is not None else "null", inline=False)
+        embed.add_embed_field(name="交易策略", value=self._str_content_translate(strategy) if strategy is not None else "手動買賣", inline=False)
         embed.add_embed_field(name="開倉時間", value=self._format_timestamp(open_time) if open_time is not None else "null", inline=False)
         embed.add_embed_field(name="平倉時間", value=self._format_timestamp(close_time) if close_time is not None else "null", inline=False)
-        embed.add_embed_field(name="開倉價格", value=str(open_price) if open_price is not None else "null", inline=False)
-        embed.add_embed_field(name="平倉價格", value=str(close_price) if close_price is not None else "null", inline=False)
+        embed.add_embed_field(name="開倉價格", value=f"{open_price} USDT" if open_price is not None else "null", inline=False)
+        embed.add_embed_field(name="平倉價格", value=f"{close_price} USDT" if close_price is not None else "null", inline=False)
         embed.add_embed_field(name="平倉原因", value=self._str_content_translate(close_reason) if close_reason is not None else "null", inline=False)
-        embed.add_embed_field(name="倉位大小(USDT)", value=str(position_size) if position_size is not None else "null", inline=False)
-        embed.add_embed_field(name="盈虧(USDT)", value=str(pnl) if pnl is not None else "null", inline=False)
+        embed.add_embed_field(name="倉位大小", value=f"{position_size} USDT" if position_size is not None else "null", inline=False)
+        embed.add_embed_field(name="盈虧", value=f"{pnl} USDT" if pnl is not None else "null", inline=False)
         embed.add_embed_field(name="盈虧率", value=f"{pnl_percentage} %" if pnl_percentage is not None else "null", inline=False)
         
         return embed
@@ -101,18 +101,18 @@ class MessageFormatter:
         # 添加基本字段
         embed.add_embed_field(name="交易對", value=symbol, inline=False)
         embed.add_embed_field(name="交易方向", value=self._str_content_translate(side) if side is not None else "null", inline=False)
-        embed.add_embed_field(name="交易策略", value=self._str_content_translate(strategy) if strategy is not None else "null", inline=False)
+        embed.add_embed_field(name="交易策略", value=self._str_content_translate(strategy) if strategy is not None else "手動買賣", inline=False)
         embed.add_embed_field(name="開倉時間", value=self._format_timestamp(open_time) if open_time is not None else "null", inline=False)
-        embed.add_embed_field(name="開倉價格", value=str(open_price) if open_price is not None else "null", inline=False)
-        embed.add_embed_field(name="倉位大小(USDT)", value=str(position_size) if position_size is not None else "null", inline=False)
+        embed.add_embed_field(name="開倉價格", value=f"{open_price} USDT" if open_price is not None else "null", inline=False)
+        embed.add_embed_field(name="倉位大小(USDT)", value=f"{position_size} USDT" if position_size is not None else "null", inline=False)
         
         # 添加可選字段
         if stop_loss is not None:
-            embed.add_embed_field(name="止損價格", value=str(stop_loss), inline=False)
+            embed.add_embed_field(name="止損價格", value=f"{stop_loss} USDT", inline=False)
         if take_profit is not None:
-            embed.add_embed_field(name="止盈價格", value=str(take_profit), inline=False)
+            embed.add_embed_field(name="止盈價格", value=f"{take_profit} USDT", inline=False)
         if trailing_stop is not None:
-            embed.add_embed_field(name="移動止損觸發價格", value=str(trailing_stop), inline=False)
+            embed.add_embed_field(name="移動止損觸發價格", value=f"{trailing_stop} USDT", inline=False)
         if price_rate is not None:
             embed.add_embed_field(name="回調率", value=f"{price_rate} %", inline=False)
         
@@ -123,6 +123,8 @@ class MessageFormatter:
         status: str,
         environment: str,
         account_equity: Decimal,
+        daily_trades: int,
+        daily_pnl: Decimal,
         unrealized_pnl: Decimal,
         unrealized_pnl_percentage: Decimal,
         positions: List[str]
@@ -135,8 +137,10 @@ class MessageFormatter:
         
         embed.add_embed_field(name="機器人狀態", value=status, inline=False)
         embed.add_embed_field(name="運行環境", value=environment, inline=False)
-        embed.add_embed_field(name="帳戶權益(USDT)", value=str(account_equity) if account_equity is not None else "null", inline=False)
-        embed.add_embed_field(name="未實現盈虧(USDT)", value=str(unrealized_pnl) if unrealized_pnl is not None else "null", inline=False)
+        embed.add_embed_field(name="帳戶權益", value=f"{account_equity} USDT" if account_equity is not None else "null", inline=False)
+        embed.add_embed_field(name="單日開倉次數", value=f"{daily_trades} 次" if daily_trades is not None else "null", inline=False)
+        embed.add_embed_field(name="單日累計盈虧", value=f"{daily_pnl} USDT" if daily_pnl is not None else "null", inline=False)
+        embed.add_embed_field(name="未實現盈虧", value=f"{unrealized_pnl} USDT" if unrealized_pnl is not None else "null", inline=False)
         embed.add_embed_field(name="未實現盈虧率", value=f"{unrealized_pnl_percentage} %" if unrealized_pnl_percentage is not None else "null", inline=False)
         embed.add_embed_field(name="目前持倉交易對", value="、".join(positions) if positions else "無", inline=False)
         

@@ -115,6 +115,7 @@ class Order(OrderBase):
         client_order_id: 客戶端訂單ID
         orig_qty: 原始訂單數量
         executed_qty: 已執行數量
+        last_filled_qty: 最後成交數量
         cummulative_quote_qty: 累計成交金額
         realized_profit: 已實現盈虧
         status: 訂單狀態
@@ -146,6 +147,7 @@ class Order(OrderBase):
     order_id: Optional[int] = None
     client_order_id: Optional[str] = None
     orig_qty: Optional[Decimal] = None
+    last_filled_qty: Optional[Decimal] = None
     executed_qty: Optional[Decimal] = None
     cummulative_quote_qty: Optional[Decimal] = None
     realized_profit: Optional[Decimal] = None

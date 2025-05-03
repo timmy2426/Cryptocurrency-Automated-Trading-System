@@ -36,23 +36,6 @@ trading:
     - BTCUSDT
     - ETHUSDT
     - SOLUSDT
-    - XRPUSDT
-    - ADAUSDT
-    - EOSUSDT
-    - BCHUSDT
-    - LTCUSDT
-    - XLMUSDT
-    - TRXUSDT
-    - LINKUSDT
-    - IOTAUSDT
-    - XTZUSDT
-    - BNBUSDT
-    - QTUMUSDT
-    - DOGEUSDT
-    - VETUSDT
-    - ZILUSDT
-    - PUMPUSDT
-    - ONTUSDT
   leverage: 5
   price_protect: true
   activate_price_rate: 0.01
@@ -68,5 +51,6 @@ risk_control:
   max_holding_bars: 6
   max_daily_trades: 10
   max_daily_loss: 0.1
+  consecutive_losses: 3
   cooldown_period: 3600
   min_bandwidth_threshold: 0.0001

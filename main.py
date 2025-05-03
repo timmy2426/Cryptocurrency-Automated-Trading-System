@@ -142,8 +142,7 @@ class TradingBot:
         try:
             # 啟動倉位監聽
             self.api.start_position_listener(
-                position_callback=self.position_manager.position_callback,
-                order_callback=self.position_manager.order_callback
+                order_callback=self.position_manager.update_position_info
             )
             logger.info("倉位監聽已啟動")
             

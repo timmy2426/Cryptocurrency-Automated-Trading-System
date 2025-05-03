@@ -122,21 +122,27 @@ class Trader:
             # 獲取K線數據
             df_15min = self._get_klines(symbol)
             indicators = self.signal_generator.calculate_indicators(df_15min)
-            
+
             # 根據開倉策略檢查出場信號
             should_close = False
-            logger.info(f"倉位 {symbol} 開倉策略: {position['strategy']}")
-            if position['strategy'].startswith("trend"):
-                if position['side'] == "BUY":
-                    should_close = self.signal_generator.is_trend_long_exit(df_15min, indicators).iloc[-2]
-                else:
-                    should_close = self.signal_generator.is_trend_short_exit(df_15min, indicators).iloc[-2]
-            else:  # mean_reversion
-                if position['side'] == "BUY":
-                    should_close = self.signal_generator.is_mean_rev_long_exit(df_15min, indicators).iloc[-2]
-                else:
-                    should_close = self.signal_generator.is_mean_rev_short_exit(df_15min, indicators).iloc[-2]
-                    
+            if position['strategy'] != None:
+                if position['strategy'].startswith("trend"):
+                    if position['side'] == "BUY":
+                        should_close = self.signal_generator.is_trend_long_exit(df_15min, indicators).iloc[-2]
+                    else:
+                        should_close = self.signal_generator.is_trend_short_exit(df_15min, indicators).iloc[-2]
+                else:  # mean_reversion
+                    if position['side'] == "BUY":
+                        should_close = self.signal_generator.is_mean_rev_long_exit(df_15min, indicators).iloc[-2]
+                    else:
+                        should_close = self.signal_generator.is_mean_rev_short_exit(df_15min, indicators).iloc[-2]
+
+            # 開倉不完整的自我修正機制
+            if (self.position_manager.positions[symbol]['open_time'] == None or
+                self.position_manager.positions[symbol]['strategy'] == None or
+                self.position_manager.positions[symbol]['stop_loss'] == None):
+                should_close = True
+
             # 如果出場信號為真或倉位管理器建議平倉，則執行平倉
             if should_close or self.position_manager.can_close_position(symbol):
                 # 執行市價平倉
@@ -148,15 +154,15 @@ class Trader:
                 while retry_count < max_retries:
                     # 檢查倉位狀態
                     order_status = self.order_executor.get_order_status(symbol, order_result.order_id)
-                    if (order_status.status == OrderStatus.FILLED and
-                        self.position_manager.positions[symbol]['close_time'] != None and
-                        self.position_manager.positions[symbol]['close_price'] != Decimal('0') and
-                        self.position_manager.positions[symbol]['close_reason'] != None and
-                        self.position_manager.positions[symbol]['pnl'] != Decimal('0')
-                        ):
-                        logger.info(f"{symbol} 倉位已完全更新")
+                    
+                    if order_status.status == OrderStatus.FILLED:
+                        logger.info(f"{symbol} 訂單已完全成交")
                         break
-                    elif order_status.status in [OrderStatus.CANCELED, OrderStatus.REJECTED, OrderStatus.EXPIRED]:
+                    elif order_status.status in [OrderStatus.CANCELED, OrderStatus.EXPIRED]:
+                        if order_status.executed_qty != Decimal('0'):
+                            logger.info(f"{symbol} 訂單部分成交，其餘已取消或過期")
+                            break
+                    else:
                         logger.error(f"平倉訂單 {order_result.order_id} 狀態異常: {order_status}")
                         return
                     
@@ -164,8 +170,10 @@ class Trader:
                     time.sleep(1)
                     retry_count += 1
                 else:
-                    logger.error(f"{symbol} 倉位在 {max_retries} 秒內未完全更新")
+                    logger.error(f"{symbol} 倉位在 {max_retries} 秒內未成交")
                     return
+                
+                self.position_manager.close_position_complete(symbol)
                 
                 # 平倉成功後取消該交易對的所有未成交訂單
                 try:
@@ -227,30 +235,29 @@ class Trader:
             # 執行市價開倉
             order_result = self.order_executor.open_position_market(order)
 
-            # 等待倉位完全更新
+            # 等待訂單完全成交
             max_retries = 60
             retry_count = 0
             while retry_count < max_retries:
-                # 檢查倉位狀態
+                # 檢查訂單狀態
                 order_status = self.order_executor.get_order_status(symbol, order_result.order_id)
-                if (order_status.status == OrderStatus.FILLED and
-                    self.position_manager.positions[symbol]['symbol'] != None and
-                    self.position_manager.positions[symbol]['side'] != None and
-                    self.position_manager.positions[symbol]['open_time'] != None and
-                    self.position_manager.positions[symbol]['open_price'] != Decimal('0') and
-                    self.position_manager.positions[symbol]['position_size'] != Decimal('0')
-                    ):
-                    logger.info(f"{symbol} 倉位已完全更新")
+                
+                if order_status.status == OrderStatus.FILLED:
+                    logger.info(f"{symbol} 訂單已完全成交")
                     break
-                elif order_status.status in [OrderStatus.CANCELED, OrderStatus.REJECTED, OrderStatus.EXPIRED]:
-                    logger.error(f"開倉訂單 {order_result.order_id} 狀態異常: {order_status}")
-                    return
+                elif order_status.status in [OrderStatus.CANCELED, OrderStatus.EXPIRED]:
+                    if order_status.executedQty != Decimal('0'):
+                        logger.info(f"{symbol} 訂單部分成交，其餘已取消或過期")
+                        break
+                    else:
+                        logger.error(f"開倉訂單 {order_result.order_id} 狀態異常: {order_status}")
+                        return
                 
                 logger.info(f"等待開倉訂單成交，當前狀態: {order_status}")
                 time.sleep(1)
                 retry_count += 1
             else:
-                logger.error(f"{symbol} 倉位在 {max_retries} 秒內未完全更新")
+                logger.error(f"{symbol} 倉位在 {max_retries} 秒內未成交")
                 return
 
             # 更新倉位信息
@@ -305,7 +312,7 @@ class Trader:
                 symbol=symbol,
                 side=OrderSide.SELL if self.position_manager.positions[symbol]['side'] == "BUY" else OrderSide.BUY,
                 type=OrderType.TRAILING_STOP_MARKET,
-                quantity=abs(self.position_manager.positions[symbol]['position_amt']),
+                quantity=abs(self.position_manager.positions[symbol]['open_amt']),
                 activate_price=activate_price,
                 price_rate=Decimal(str(self.config['trailing_percent'])),
                 reduce_only=True
@@ -317,8 +324,7 @@ class Trader:
                 trailing_stop_order_result, 
                 {'trailing_stop': activate_price, 'price_rate': Decimal(str(self.config['trailing_percent']))})
             
-            # 所有訂單設定完成
-            self.position_manager.position_update_complete(symbol)
+            self.position_manager.open_position_complete(symbol)
             
             logger.info(f"倉位 {symbol} 止損止盈設定完成")
         except Exception as e:
@@ -369,8 +375,7 @@ class Trader:
             # 更新倉位信息
             self.position_manager.update_position_info(take_profit_order_result, {'take_profit': take_profit_price})
 
-            # 所有訂單設定完成
-            self.position_manager.position_update_complete(symbol)
+            self.position_manager.open_position_complete(symbol)
 
             logger.info(f"倉位 {symbol} 止損止盈設定完成")
         except Exception as e:
