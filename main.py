@@ -241,9 +241,9 @@ def main():
     except KeyboardInterrupt:
         logger.info("收到鍵盤中斷信號")
     except Exception as e:
-        embed = bot.message_formatter.create_error_message(e)
+        embed = bot.message_formatter.create_error_message(str(e))
         bot.send_message.send_error_message(embed)
-        bot.event_logger.error_log(e)
+        bot.event_logger.error_log(str(e))
         logger.error(f"程序異常: {str(e)}")
     finally:
         if 'bot' in locals():

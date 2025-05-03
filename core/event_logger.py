@@ -89,7 +89,7 @@ class EventLogger:
             # 構建錯誤信息
             error_info = {
                 "timestamp": int(time.time() * 1000),  # 毫秒時間戳
-                "error": str(error_message)  # 確保錯誤信息是字符串
+                "error": error_message
             }
             
             # 寫入日誌文件

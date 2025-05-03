@@ -36,6 +36,23 @@ trading:
     - BTCUSDT
     - ETHUSDT
     - SOLUSDT
+    - XRPUSDT
+    - ADAUSDT
+    - EOSUSDT
+    - BCHUSDT
+    - LTCUSDT
+    - XLMUSDT
+    - TRXUSDT
+    - LINKUSDT
+    - IOTAUSDT
+    - XTZUSDT
+    - BNBUSDT
+    - QTUMUSDT
+    - DOGEUSDT
+    - VETUSDT
+    - ZILUSDT
+    - PUMPUSDT
+    - ONTUSDT
   leverage: 5
   price_protect: true
   activate_price_rate: 0.01
