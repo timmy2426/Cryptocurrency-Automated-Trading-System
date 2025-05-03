@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -20,9 +19,11 @@ var/
 .installed.cfg
 *.egg
 
-# Virtual Environment
+# 虛擬環境
 venv/
 ENV/
+env/
+.venv
 
 # IDE
 .idea/
@@ -30,57 +31,42 @@ ENV/
 *.swp
 *.swo
 
-# OS
+# 系統文件
 .DS_Store
 Thumbs.db
 
-# Logs
+# 日誌文件
+error_log/
+trade_log/
 *.log
 
-# Local configuration
+# 本地配置
 .env
 .env.local
 config/api_keys.env
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-*.egg-info/
-.installed.cfg
-*.egg
+# 測試相關
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+coverage.xml
+*.cover
 
-# Virtual Environment
-venv/
-ENV/
+# 數據文件
+*.csv
+*.xlsx
+*.xls
+*.db
+*.sqlite3
 
-# IDE
-.idea/
-.vscode/
+# 臨時文件
+*.tmp
+*.temp
+*.bak
 *.swp
-*.swo
+*~
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
-# Local configuration
-.env
-.env.local 
+# 其他
+.ipynb_checkpoints/
+.hypothesis/ 
