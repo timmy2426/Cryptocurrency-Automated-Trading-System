@@ -36,8 +36,10 @@ env/
 Thumbs.db
 
 # 日誌文件
-error_log/
-trade_log/
+logs/*
+!logs/
+logs/error_log/*
+logs/trade_log/*
 *.log
 
 # 本地配置
