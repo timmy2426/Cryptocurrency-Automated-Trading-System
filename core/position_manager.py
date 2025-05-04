@@ -1,6 +1,6 @@
 import logging
 from threading import Lock
-from typing import Dict, Optional, List, Any, Union, Callable
+from typing import Dict, Optional, List, Any, Union, Callable, TYPE_CHECKING
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, time as dt_time
 import time
@@ -21,6 +21,9 @@ from exchange import (
 )
 from utils.config import check_config_parameters
 from data.indicators import TechnicalIndicators
+
+if TYPE_CHECKING:
+    from discord_bot import MessageFormatter, SendMessage
 
 logger = logging.getLogger(__name__)
 
@@ -465,38 +468,6 @@ class PositionManager:
         except Exception as e:
             logger.error(f"平倉完成失敗: {str(e)}")
             raise
-    """
-    def position_callback(self, position_info: PositionInfo) -> None:
-        
-        倉位更新回調函數
-        
-        Args:
-            position_info: PositionInfo 對象，包含倉位信息
-        
-        try:
-            return position_info
-
-        except Exception as e:
-            logger.error(f"處理倉位更新失敗: {str(e)}")
-            raise
-    
-    def order_callback(self, order_info: Order) -> None:
-        
-        訂單更新回調函數
-        
-        Args:
-            order_info: Order 對象，包含訂單信息
-        
-        try:
-            # 檢查訂單是否成交
-            if order_info.status == OrderStatus.FILLED or order_info.status == OrderStatus.PARTIALLY_FILLED:
-                # 更新倉位信息
-                self.update_position_info(order_info)
-        
-        except Exception as e:
-            logger.error(f"處理訂單更新失敗: {str(e)}")
-            raise
-    """
 
     def check_margin_usage(self) -> bool:
         """
@@ -619,7 +590,7 @@ class PositionManager:
             # 計算 ATR 百分比
             indicators = TechnicalIndicators()
             atr_percentage = indicators.calculate_atr_percentage(df)
-            current_atr_percentage = float(atr_percentage.iloc[-1])
+            current_atr_percentage = float(atr_percentage.iloc[-2])
             
             # 根據 ATR 百分比調整倉位大小
             if current_atr_percentage > 0.01:  # ATR 百分比大於 1%
