@@ -78,8 +78,6 @@ class SignalGenerator:
             # 計算平均RSI
             avg_rsi = self.indicators.calculate_average_rsi(rsi)
             indicators['avg_rsi'] = avg_rsi
-
-            logger.info(f"計算技術指標完成: {indicators}")
             
             return indicators
             
@@ -168,7 +166,7 @@ class SignalGenerator:
             pd.Series: 買入信號序列
         """
         try:
-            # 1. 價格觸及布林帶下軌 ± 0.2% 區間
+            # 1. 價格觸及布林帶下軌 ± bb_price_threshold 區間
             price_near_lower = pd.Series([
                 self.indicators.is_price_near_band(price, upper, lower)[1]
                 for price, upper, lower in zip(df['close'], indicators['upper_band'], indicators['lower_band'])
@@ -206,7 +204,7 @@ class SignalGenerator:
             pd.Series: 賣出信號序列
         """
         try:
-            # 1. 價格觸及布林帶上軌 ± 0.2% 區間
+            # 1. 價格觸及布林帶上軌 ± bb_price_threshold 區間
             price_near_upper = pd.Series([
                 self.indicators.is_price_near_band(price, upper, lower)[0]
                 for price, upper, lower in zip(df['close'], indicators['upper_band'], indicators['lower_band'])

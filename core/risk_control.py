@@ -16,6 +16,8 @@ class RiskControl:
             # 加載風險控制配置參數
             required_params = [
                 'ma_slow_length',
+                'ma_slope_window',
+                'ma_slope_threshold',
                 'average_volume_window',
                 'min_bandwidth_threshold'
             ]
@@ -55,13 +57,14 @@ class RiskControl:
                 ma_slow = df['close'].rolling(window=self.config['ma_slow_length']).mean()
                 
                 # 計算斜率
-                ma20_slope = ma20.diff()
-                ma_slow_slope = ma_slow.diff()
+                ma20_slope = ma20.pct_change(periods=self.config['ma_slope_window'])
+                ma_slow_slope = ma_slow.pct_change(periods=self.config['ma_slope_window'])
                 
                 # 判斷趨勢
-                if (ma20.iloc[-2] > ma_slow.iloc[-2]) and (ma20_slope.iloc[-2] > 0) and (ma_slow_slope.iloc[-2] > 0):
+                slope_threshold = self.config['ma_slope_threshold']
+                if (ma20.iloc[-2] > ma_slow.iloc[-2]) and (ma20_slope.iloc[-2] > slope_threshold) and (ma_slow_slope.iloc[-2] > 0):
                     trend_score = 1
-                elif (ma20.iloc[-2] < ma_slow.iloc[-2]) and (ma20_slope.iloc[-2] < 0) and (ma_slow_slope.iloc[-2] < 0):
+                elif (ma20.iloc[-2] < ma_slow.iloc[-2]) and (ma20_slope.iloc[-2] < -slope_threshold) and (ma_slow_slope.iloc[-2] < 0):
                     trend_score = -1
                 else:
                     trend_score = 0
@@ -69,12 +72,12 @@ class RiskControl:
                 trend_scores.append(trend_score)
                 
             # 計算加權總分
-            total_score = (trend_scores[0] * 1) + (trend_scores[1] * 2) + (trend_scores[2] * 3)
+            total_score = (trend_scores[0] * 3) + (trend_scores[1] * 2) + (trend_scores[2] * 1)
             
             # 判斷趨勢
-            if total_score > 4:
+            if total_score >= 4:
                 return 'uptrend'
-            elif total_score < -4:
+            elif total_score <= -4:
                 return 'downtrend'
             else:
                 return 'sideway'

@@ -121,11 +121,13 @@
 - Python 3.8+
 - 相關套件：
   - binance-futures-connector
-  - websocket-client
+  - python-dotenv
   - pandas
   - pyyaml
+  - websocket-client
   - discord-webhook
-  - ta (技術分析庫)
+  - numpy
+  - pytest
 
 ## 使用說明
 

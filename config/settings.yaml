@@ -17,47 +17,35 @@ binance_api:
 
 index:
   bb_length: 20
-  bb_mult: 0.5
-  bb_change_rate: 0.001
-  bb_change_rate_window: 10
-  bb_price_threshold: 0.1
+  bb_mult: 1.5
+  bb_change_rate: 0.1
+  bb_change_rate_window: 6
+  bb_price_threshold: 0.0005
   rsi_length: 14
-  rsi_overbought: 60
-  rsi_oversold: 40
-  rsi_momentum_offset: 20
-  rsi_reversal_offset: 20
-  rsi_average_window: 3
+  rsi_overbought: 70
+  rsi_oversold: 30
+  rsi_momentum_offset: 5
+  rsi_reversal_offset: 5
+  rsi_average_window: 6
   ma_slow_length: 50
+  ma_slope_window: 6
+  ma_slope_threshold: 0.0025
   atr_period: 14
-  average_volume_window: 300
+  average_volume_window: 100
 
 trading:
   symbol_list:
     - BTCUSDT
     - ETHUSDT
-    - SOLUSDT
     - XRPUSDT
-    - ADAUSDT
-    - EOSUSDT
-    - BCHUSDT
-    - LTCUSDT
-    - XLMUSDT
-    - TRXUSDT
-    - LINKUSDT
-    - IOTAUSDT
-    - XTZUSDT
     - BNBUSDT
-    - QTUMUSDT
-    - DOGEUSDT
-    - VETUSDT
-    - ZILUSDT
-    - PUMPUSDT
-    - ONTUSDT
+    - SOLUSDT
+    - ADAUSDT
   leverage: 5
   price_protect: true
   activate_price_rate: 0.01
-  trailing_percent: 0.8 #百分比%
-  max_loss_percent: 0.012
+  trailing_percent: 1.2 #百分比%
+  max_loss_percent: 0.015
   mean_reversion_tp: 0.018
   mean_reversion_sl: 0.01
 
@@ -66,8 +54,8 @@ risk_control:
   max_margin_usage: 0.7
   slippage_percent: 0.5 #百分比%
   max_holding_bars: 6
-  max_daily_trades: 10
-  max_daily_loss: 0.1
+  max_daily_trades: 5
+  max_daily_loss: 0.02
   consecutive_losses: 3
   cooldown_period: 3600
-  min_bandwidth_threshold: 0.0001
+  min_bandwidth_threshold: 0.008

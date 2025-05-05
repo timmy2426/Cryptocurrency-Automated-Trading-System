@@ -517,6 +517,7 @@ class PositionManager:
         try:
             self._reset_daily_data()
             return self.account_info['daily_trades'] < self.config['max_daily_trades']
+        
         except Exception as e:
             logger.error(f"檢查單日累計開倉數量失敗: {str(e)}")
             return False
@@ -539,6 +540,7 @@ class PositionManager:
                     self.is_cooldown_activate = False
                     logger.info(f"冷卻期結束")
             return True
+        
         except Exception as e:
             logger.error(f"檢查冷卻期失敗: {str(e)}")
             return False
@@ -555,11 +557,12 @@ class PositionManager:
         """
         try:
             if symbol not in self.positions:
-                return True
+                return False
                 
             current_time = int(time.time() * 1000)
             holding_time = current_time - self.positions[symbol]['open_time']
             return holding_time <= self.config['max_holding_bars'] * 15 * 60 * 1000  # 轉換為毫秒
+        
         except Exception as e:
             logger.error(f"檢查倉位存續期失敗: {str(e)}")
             return False
