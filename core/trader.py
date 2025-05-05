@@ -235,6 +235,10 @@ class Trader:
             # 執行市價開倉
             order_result = self.order_executor.open_position_market(order)
 
+            # 更新倉位信息
+            self.position_manager.update_position_info(order_result, {'strategy': selected_strategy})
+            logger.info(f"倉位策略： {self.position_manager.positions[symbol]['strategy']}")
+
             # 等待訂單完全成交
             max_retries = 60
             retry_count = 0
@@ -260,10 +264,6 @@ class Trader:
                 logger.error(f"{symbol} 倉位在 {max_retries} 秒內未成交")
                 return
 
-            # 更新倉位信息
-            self.position_manager.update_position_info(order_result, {'strategy': selected_strategy})
-            logger.info(f"倉位策略： {self.position_manager.positions[symbol]['strategy']}")
-            
             # 獲取開倉價格
             open_price = self.position_manager.positions[symbol]['open_price']
             
