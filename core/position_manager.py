@@ -102,6 +102,7 @@ class PositionManager:
         try:
             # 檢查配置參數
             required_params = [
+                'symbol_list',
                 'max_margin_usage',
                 'max_daily_loss',
                 'max_daily_trades',
@@ -242,6 +243,11 @@ class PositionManager:
             if not symbol:
                 logger.error("無法獲取交易對信息")
                 return
+            
+            # 檢查交易對是否在標的列表中
+            if symbol not in self.config['symbol_list']:
+                logger.info(f"交易對 {symbol} 不在標的列表中，跳過紀錄倉位信息")
+                return
                 
             # 如果倉位不存在，創建新的倉位信息字典
             if symbol not in self.positions:
@@ -249,7 +255,7 @@ class PositionManager:
                 self.positions[symbol]['symbol'] = symbol  # 更新交易對
 
             # 更新訂單結果
-            if isinstance(position_data, Order) and position_data.status != OrderStatus.NEW:
+            if isinstance(position_data, Order) and position_data.status in [OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED]:
                 if position_data.reduce_only  or position_data.close_position: # 平倉單成交
                     self.positions[symbol]['side'] = position_data.side.value
                     self.positions[symbol]['close_time'] = position_data.timestamp
@@ -301,14 +307,16 @@ class PositionManager:
             if position_data.status == OrderStatus.FILLED:
                 if position_data.reduce_only or position_data.close_position:
                     self.close_position_complete(symbol)
-                else:
-                    self.open_position_complete(symbol)
+                elif self.positions[symbol]['strategy'] and self.positions[symbol]['stop_loss']:
+                    if self.positions[symbol]['take_profit'] or self.positions[symbol]['trailing_stop']:
+                        self.open_position_complete(symbol)
             elif position_data.status in [OrderStatus.CANCELED, OrderStatus.EXPIRED]:
-                if position_data.executed_qty != Decimal('0'):
+                if position_data.executed_qty:
                     if position_data.reduce_only or position_data.close_position:
                         self.close_position_complete(symbol)
-                    else:
-                        self.open_position_complete(symbol)
+                    elif self.positions[symbol]['strategy'] and self.positions[symbol]['stop_loss']:
+                        if self.positions[symbol]['take_profit'] or self.positions[symbol]['trailing_stop']:
+                            self.open_position_complete(symbol)
         
         except Exception as e:
             logger.error(f"更新倉位信息失敗: {str(e)}")
@@ -421,10 +429,10 @@ class PositionManager:
                 
                 current_time = int(time.time() * 1000)
 
-                # 檢查是否為虧損平倉
+                # 紀錄盈虧並檢查是否為虧損平倉
+                self.account_info['daily_pnl'] += self.positions[symbol]['pnl']
                 if self.positions[symbol]['pnl'] < 0:
                     self.consecutive_losses += 1
-                    self.account_info['daily_pnl'] += self.positions[symbol]['pnl']
                     if self.consecutive_losses >= self.config['consecutive_losses']:
                         self.cooldown_start_time = current_time
                         self.is_cooldown_activate = True

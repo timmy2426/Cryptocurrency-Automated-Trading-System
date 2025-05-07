@@ -174,13 +174,6 @@ class Trader:
                     return
                 
                 self.position_manager.close_position_complete(symbol)
-                
-                # 平倉成功後取消該交易對的所有未成交訂單
-                try:
-                    canceled_orders = self.order_executor.cancel_all_orders(symbol)
-                    logger.info(f"平倉成功後取消 {symbol} 的未成交訂單: {len(canceled_orders)} 個")
-                except Exception as e:
-                    logger.error(f"取消 {symbol} 的未成交訂單失敗: {str(e)}")
 
             logger.info(f"倉位 {symbol} 出場信號檢查完成")
                     
