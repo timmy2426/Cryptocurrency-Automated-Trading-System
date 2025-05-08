@@ -20,16 +20,16 @@ index:
   bb_mult: 1.5
   bb_change_rate: 0.05
   bb_change_rate_window: 3
-  bb_price_threshold: 0.003
+  bb_price_threshold: 0.002
   rsi_length: 14
   rsi_overbought: 65
   rsi_oversold: 35
   rsi_momentum_offset: 5
-  rsi_reversal_offset: 5
+  rsi_reversal_offset: 10
   rsi_average_window: 3
   ma_slow_length: 50
   ma_slope_window: 6
-  ma_slope_threshold: 0.002
+  ma_slope_threshold: 0.005
   atr_period: 14
   average_volume_window: 6
 
@@ -59,9 +59,9 @@ risk_control:
   risk_per_trade: 0.005
   max_margin_usage: 0.7
   slippage_percent: 0.5 #百分比%
-  max_holding_bars: 12
-  max_daily_trades: 10
+  max_holding_bars: 8
+  max_daily_trades: 30
   max_daily_loss: 0.02
   consecutive_losses: 3
   cooldown_period: 3600
-  min_bandwidth_threshold: 0.005
+  min_bandwidth_threshold: 0.008

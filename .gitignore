@@ -37,10 +37,9 @@ Thumbs.db
 
 # 日誌文件
 logs/*
-!logs/
-logs/error_log/*
-logs/trade_log/*
+!logs/performance_analysis.py
 *.log
+*.jsonl
 
 # 本地配置
 .env
