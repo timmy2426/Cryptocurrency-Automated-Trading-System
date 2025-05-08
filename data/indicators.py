@@ -141,25 +141,21 @@ class TechnicalIndicators:
             pd.Series: RSI值
         """
         try:
-            # 計算價格變化
+            length = self.config['rsi_length']
             delta = df['close'].diff()
-            
-            # 分離上漲和下跌
-            gain = delta.where(delta > 0, 0)
-            loss = -delta.where(delta < 0, 0)
-            
-            # 計算平均上漲和下跌
-            avg_gain = gain.rolling(window=self.config['rsi_length']).mean()
-            avg_loss = loss.rolling(window=self.config['rsi_length']).mean()
-            
-            # 計算RS
+
+            gain = delta.clip(lower=0)
+            loss = -delta.clip(upper=0)
+
+            # 初始值：只留 NaN
+            avg_gain = gain.ewm(alpha=1/length, min_periods=length, adjust=False).mean()
+            avg_loss = loss.ewm(alpha=1/length, min_periods=length, adjust=False).mean()
+
             rs = avg_gain / avg_loss
-            
-            # 計算RSI
             rsi = 100 - (100 / (1 + rs))
-            
+
             return rsi
-            
+
         except Exception as e:
             logger.error(f"計算RSI失敗: {str(e)}")
             raise
@@ -232,12 +228,13 @@ class TechnicalIndicators:
             high_low = df['high'] - df['low']
             high_close = abs(df['high'] - df['close'].shift(1))
             low_close = abs(df['low'] - df['close'].shift(1))
+            length = self.config['atr_period']
             
             # 取三者中的最大值
             tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
             
             # 計算ATR
-            atr = tr.rolling(window=self.config['atr_period']).mean()
+            atr = tr.ewm(alpha=1/length, min_periods=length, adjust=False).mean()
             
             return atr
             
