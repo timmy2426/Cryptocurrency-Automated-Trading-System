@@ -185,7 +185,7 @@ class SignalGenerator:
             )
             
             # 綜合判斷
-            entry_signal = price_near_lower & rsi_condition & bandwidth_narrowing
+            entry_signal = price_near_lower & rsi_condition | price_near_lower & bandwidth_narrowing
             
             return entry_signal
             
@@ -223,7 +223,7 @@ class SignalGenerator:
             )
             
             # 綜合判斷
-            entry_signal = price_near_upper & rsi_condition & bandwidth_narrowing
+            entry_signal = price_near_upper & rsi_condition | price_near_upper & bandwidth_narrowing
             
             return entry_signal
             
@@ -301,10 +301,10 @@ class SignalGenerator:
         """
         try:
             # 1. 價格回到布林中軌
-            price_exit = abs(df['close'] - indicators['middle_band']) / indicators['middle_band'] <= 0.002
+            price_exit = abs(df['close'] - indicators['middle_band']) / indicators['middle_band'] <= self.config['bb_price_threshold']
             
             # 2. RSI 回升至約 50 上下
-            rsi_exit = abs(indicators['rsi'] - 50) <= 5
+            rsi_exit = abs(indicators['rsi'] - 50) <= 3
             
             # 綜合判斷
             exit_signal = price_exit | rsi_exit
@@ -327,10 +327,10 @@ class SignalGenerator:
         """
         try:
             # 1. 價格回到布林中軌
-            price_exit = abs(df['close'] - indicators['middle_band']) / indicators['middle_band'] <= 0.002
+            price_exit = abs(df['close'] - indicators['middle_band']) / indicators['middle_band'] <= self.config['bb_price_threshold']
             
             # 2. RSI 降至約 50 上下
-            rsi_exit = abs(indicators['rsi'] - 50) <= 5
+            rsi_exit = abs(indicators['rsi'] - 50) <= 3
             
             # 綜合判斷
             exit_signal = price_exit | rsi_exit
