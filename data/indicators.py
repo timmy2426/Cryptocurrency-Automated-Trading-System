@@ -19,12 +19,8 @@ class TechnicalIndicators:
                 'bb_change_rate_window',
                 'bb_price_threshold',
                 'rsi_length',
-                'rsi_overbought',
-                'rsi_oversold',
-                'rsi_momentum_offset',
-                'rsi_reversal_offset',
                 'rsi_average_window',
-                'ma_slow_length',
+                'ma_slope_window',
                 'atr_period',
                 'average_volume_window'
             ]
@@ -178,7 +174,7 @@ class TechnicalIndicators:
             logger.error(f"計算平均RSI失敗: {str(e)}")
             raise
             
-    def calculate_sma(self, df: pd.DataFrame) -> pd.Series:
+    def calculate_sma(self, df: pd.DataFrame, window: int) -> pd.Series:
         """計算簡單移動平均線
         
         Args:
@@ -189,13 +185,31 @@ class TechnicalIndicators:
         """
         try:
             # 計算簡單移動平均
-            sma = df['close'].rolling(window=self.config['ma_slow_length']).mean()
+            sma = df['close'].rolling(window=window).mean()
             return sma
             
         except Exception as e:
             logger.error(f"計算移動平均線失敗: {str(e)}")
             raise
+
+    def calculate_ma_slope(self, ma: pd.Series) -> pd.Series:
+        """計算移動平均線斜率
+        
+        Args:
+            ma: 移動平均線
             
+        Returns:
+            pd.Series: 移動平均線斜率
+        """
+        try:
+            # 計算斜率
+            slope = ma.pct_change(periods=self.config['ma_slope_window'])
+            return slope
+    
+        except Exception as e:
+            logger.error(f"計算移動平均線斜率失敗: {str(e)}")
+            raise
+
     def calculate_average_volume(self, df: pd.DataFrame) -> pd.Series:
         """計算平均成交量
         

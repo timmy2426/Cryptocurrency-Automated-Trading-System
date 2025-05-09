@@ -124,24 +124,30 @@ class Trader:
             indicators = self.signal_generator.calculate_indicators(df_15min)
 
             # 根據開倉策略檢查出場信號
+            logger.info('-' * 100)
+            logger.info(f"檢查 {symbol} 平倉信號")
+
             should_close = False
             if position['strategy'] != None:
                 if position['strategy'].startswith("trend"):
                     if position['side'] == "BUY":
-                        should_close = self.signal_generator.is_trend_long_exit(df_15min, indicators).iloc[-2]
+                        should_close = self.signal_generator.is_trend_long_exit(df_15min, indicators).iloc[-1]
                     else:
-                        should_close = self.signal_generator.is_trend_short_exit(df_15min, indicators).iloc[-2]
+                        should_close = self.signal_generator.is_trend_short_exit(df_15min, indicators).iloc[-1]
                 else:  # mean_reversion
                     if position['side'] == "BUY":
-                        should_close = self.signal_generator.is_mean_rev_long_exit(df_15min, indicators).iloc[-2]
+                        should_close = self.signal_generator.is_mean_rev_long_exit(df_15min, indicators).iloc[-1]
                     else:
-                        should_close = self.signal_generator.is_mean_rev_short_exit(df_15min, indicators).iloc[-2]
+                        should_close = self.signal_generator.is_mean_rev_short_exit(df_15min, indicators).iloc[-1]
 
             # 開倉不完整的自我修正機制
             if (self.position_manager.positions[symbol]['open_time'] == None or
                 self.position_manager.positions[symbol]['strategy'] == None or
                 self.position_manager.positions[symbol]['stop_loss'] == None):
                 should_close = True
+                logger.info(f"{symbol} 開倉不完整，強制平倉")
+            
+            logger.info('-' * 100)
 
             # 如果出場信號為真或倉位管理器建議平倉，則執行平倉
             if should_close or self.position_manager.can_close_position(symbol):
@@ -149,6 +155,7 @@ class Trader:
                 order_result = self.order_executor.close_position(symbol)
                 
                 # 等待倉位完全更新
+                time.sleep(1)
                 max_retries = 60
                 retry_count = 0
                 while retry_count < max_retries:
@@ -189,10 +196,13 @@ class Trader:
             df_4h = self._get_klines(symbol, '4h')
             
             # 檢查開倉信號
+            logger.info('-' * 100)
+            logger.info(f"檢查 {symbol} 開倉信號")
+
             selected_strategy = self.strategy.select(symbol, df_15min, df_1h, df_4h)
 
             logger.info(f"倉位 {symbol} 開倉信號: {selected_strategy}")
-            logger.info(f"倉位 {symbol} 開倉信號檢查完成")
+            logger.info('-' * 100)
 
             if selected_strategy == "no_trade":
                 return
@@ -233,6 +243,7 @@ class Trader:
             logger.info(f"倉位策略： {self.position_manager.positions[symbol]['strategy']}")
 
             # 等待訂單完全成交
+            time.sleep(1)
             max_retries = 60
             retry_count = 0
             while retry_count < max_retries:

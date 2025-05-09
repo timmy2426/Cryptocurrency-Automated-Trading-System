@@ -15,10 +15,9 @@ class RiskControl:
         try:
             # 加載風險控制配置參數
             required_params = [
+                'bb_length',
                 'ma_slow_length',
-                'ma_slope_window',
                 'ma_slope_threshold',
-                'average_volume_window',
                 'min_bandwidth_threshold'
             ]
             
@@ -53,18 +52,18 @@ class RiskControl:
             
             for df in [df_15min, df_1h, df_4h]:
                 # 計算MA20和MA_slow
-                ma20 = df['close'].rolling(window=20).mean()
-                ma_slow = df['close'].rolling(window=self.config['ma_slow_length']).mean()
+                ma_fast = self.indicators.calculate_sma(df, self.config['bb_length'])
+                ma_slow = self.indicators.calculate_sma(df, self.config['ma_slow_length'])
                 
                 # 計算斜率
-                ma20_slope = ma20.pct_change(periods=self.config['ma_slope_window'])
-                ma_slow_slope = ma_slow.pct_change(periods=self.config['ma_slope_window'])
+                ma_fast_slope = self.indicators.calculate_ma_slope(ma_fast)
+                ma_slow_slope = self.indicators.calculate_ma_slope(ma_slow)
                 
                 # 判斷趨勢
                 slope_threshold = self.config['ma_slope_threshold']
-                if (ma20.iloc[-2] > ma_slow.iloc[-2]) and (ma20_slope.iloc[-2] > slope_threshold) and (ma_slow_slope.iloc[-2] > 0):
+                if (ma_fast.iloc[-1] > ma_slow.iloc[-1]) and (ma_fast_slope.iloc[-1] > slope_threshold) and (ma_slow_slope.iloc[-1] > 0):
                     trend_score = 1
-                elif (ma20.iloc[-2] < ma_slow.iloc[-2]) and (ma20_slope.iloc[-2] < -slope_threshold) and (ma_slow_slope.iloc[-2] < 0):
+                elif (ma_fast.iloc[-1] < ma_slow.iloc[-1]) and (ma_fast_slope.iloc[-1] < -slope_threshold) and (ma_slow_slope.iloc[-1] < 0):
                     trend_score = -1
                 else:
                     trend_score = 0
@@ -97,10 +96,10 @@ class RiskControl:
         """
         try:
             # 計算平均成交量
-            avg_volume = df['volume'].rolling(window=self.config['average_volume_window']).mean()
+            avg_volume = self.indicators.calculate_average_volume(df)
             
             # 判斷最新的完整K棒的成交量是否大於平均成交量
-            return df['volume'].iloc[-2] > avg_volume.iloc[-2]
+            return df['volume'].iloc[-1] > avg_volume.iloc[-1]
 
         except Exception as e:
             logger.error(f"檢查成交量濾網失敗: {str(e)}")
@@ -120,10 +119,10 @@ class RiskControl:
             middle_band, upper_band, lower_band = self.indicators.calculate_bollinger_bands(df)
             
             # 計算布林帶寬度
-            bandwidth = (upper_band - lower_band) / middle_band
+            bandwidth = self.indicators.calculate_bollinger_bandwidth(upper_band, lower_band, middle_band)
             
             # 判斷帶寬是否大於閾值
-            return bandwidth.iloc[-2] > self.config['min_bandwidth_threshold']
+            return bandwidth.iloc[-1] > self.config['min_bandwidth_threshold']
             
         except Exception as e:
             logger.error(f"檢查BB帶寬濾網失敗: {str(e)}")
