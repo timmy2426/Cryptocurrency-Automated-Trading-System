@@ -34,6 +34,7 @@ class BinanceAPI:
             # 使用 check_config_parameters 獲取配置參數
             config_params = check_config_parameters([
                 'testnet',
+                'debug',
                 'base_endpoint',
                 'testnet_rest_api_url',
                 'webSocket_base_endpoint',
@@ -89,9 +90,9 @@ class BinanceAPI:
             self._reconnect_attempts = 0
             
             # 啟用 WebSocket 調試日誌
-            websocket.enableTrace(True)
+            websocket.enableTrace(config_params['debug'])
             websocket_logger = logging.getLogger('websocket')
-            websocket_logger.setLevel(logging.DEBUG)
+            websocket_logger.setLevel(logging.DEBUG if config_params['debug'] else logging.WARNING)
             
             logger.info(f"已初始化 Binance API（{'測試網' if config_params['testnet'] else '主網'}）")
             logger.info(f"WebSocket 基礎 URL: {self.ws_base_url}")

@@ -126,6 +126,7 @@ class Trader:
             # 根據開倉策略檢查出場信號
             logger.info('-' * 100)
             logger.info(f"檢查 {symbol} 平倉信號")
+            logger.info(f"收盤價格: {df_15min['close'].iloc[-1]}")
 
             should_close = False
             if position['strategy'] != None:
@@ -182,8 +183,6 @@ class Trader:
                 
                 self.position_manager.close_position_complete(symbol)
 
-            logger.info(f"倉位 {symbol} 出場信號檢查完成")
-                    
         except Exception as e:
             logger.error(f"處理倉位 {symbol} 時發生錯誤: {str(e)}")
             
@@ -198,6 +197,7 @@ class Trader:
             # 檢查開倉信號
             logger.info('-' * 100)
             logger.info(f"檢查 {symbol} 開倉信號")
+            logger.info(f"收盤價格: {df_15min['close'].iloc[-1]}")
 
             selected_strategy = self.strategy.select(symbol, df_15min, df_1h, df_4h)
 

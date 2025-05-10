@@ -229,6 +229,7 @@ def main():
                 time.sleep(wait_seconds)
                 
                 # 記錄執行時間
+                logger.info('=' * 100)
                 logger.info(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - 執行交易檢查")
                 
                 # 執行交易機器人

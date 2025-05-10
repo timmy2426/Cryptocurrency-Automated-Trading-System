@@ -205,7 +205,7 @@ class PositionManager:
             ]
             
             logger.info("帳戶信息更新成功")
-            logger.info(f"更新帳戶信息後的帳戶信息: {self.account_info}")
+            logger.info(f"帳戶信息: {self.account_info}")
             
         except Exception as e:
             logger.error(f"更新帳戶信息失敗: {str(e)}")

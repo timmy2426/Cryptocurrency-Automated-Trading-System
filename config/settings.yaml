@@ -47,6 +47,19 @@ trading:
     - LINKUSDT
     - AVAXUSDT
     - XLMUSDT
+    - HBARUSDT
+    - BCHUSDT
+    - LTCUSDT
+    - DOTUSDT
+    - XMRUSDT
+    - EOSUSDT
+    - UNIUSDT
+    - ENAUSDT
+    - AAVEUSDT
+    - OPUSDT
+    - POLUSDT
+    - ARBUSDT
+    - ATOMUSDT
   leverage: 5
   price_protect: true
   activate_price_rate: 0.015
@@ -61,7 +74,7 @@ risk_control:
   slippage_percent: 0.5 #百分比%
   max_holding_bars: 8
   max_daily_trades: 30
-  max_daily_loss: 0.02
+  max_daily_loss: 0.03
   consecutive_losses: 3
   cooldown_period: 3600
   min_bandwidth_threshold: 0.01

@@ -98,9 +98,10 @@ class SignalGenerator:
             # 1. 收盤價突破布林帶上軌
             price_break_upper = df['close'] > indicators['upper_band']
             
-            # 2. RSI > (rsi_overbought - rsi_momentum_offset) 且呈現上升趨勢
+            # 2. RSI > (rsi_overbought - rsi_momentum_offset) ，不過熱且呈現上升趨勢
             rsi_condition = (
                 (indicators['rsi'] > (self.config['rsi_overbought'] - self.config['rsi_momentum_offset'])) &
+                (indicators['rsi'] < (self.config['rsi_overbought'] + self.config['rsi_reversal_offset'])) &
                 (indicators['rsi'] > indicators['avg_rsi'])
             )
             
@@ -113,7 +114,6 @@ class SignalGenerator:
             # 綜合判斷
             entry_signal = price_break_upper & rsi_condition & bandwidth_expanding
 
-            logger.info(f"收盤價格: {df['close'].iloc[-1]}")
             logger.info(f"突破布林上軌: {price_break_upper.iloc[-1]}, RSI上漲動能: {rsi_condition.iloc[-1]}, 布林帶寬擴大: {bandwidth_expanding.iloc[-1]}")
             logger.info(f"順勢策略做多信號: {entry_signal.iloc[-1]}")
             
@@ -137,9 +137,10 @@ class SignalGenerator:
             # 1. 收盤價跌破布林帶下軌
             price_break_lower = df['close'] < indicators['lower_band']
             
-            # 2. RSI < (rsi_oversold + rsi_momentum_offset) 且呈現下降趨勢
+            # 2. RSI < (rsi_oversold + rsi_momentum_offset) ，不過冷且呈現下降趨勢
             rsi_condition = (
                 (indicators['rsi'] < (self.config['rsi_oversold'] + self.config['rsi_momentum_offset'])) &
+                (indicators['rsi'] > (self.config['rsi_oversold'] - self.config['rsi_reversal_offset'])) &
                 (indicators['rsi'] < indicators['avg_rsi'])
             )
             
@@ -152,7 +153,6 @@ class SignalGenerator:
             # 綜合判斷
             entry_signal = price_break_lower & rsi_condition & bandwidth_expanding
 
-            logger.info(f"收盤價格: {df['close'].iloc[-1]}")
             logger.info(f"突破布林下軌: {price_break_lower.iloc[-1]}, RSI下跌動能: {rsi_condition.iloc[-1]}, 布林帶寬擴大: {bandwidth_expanding.iloc[-1]}")
             logger.info(f"順勢策略做空信號: {entry_signal.iloc[-1]}")
 
@@ -194,7 +194,6 @@ class SignalGenerator:
             # 綜合判斷
             entry_signal = price_near_lower & rsi_condition & ma_slope_condition
 
-            logger.info(f"收盤價格: {df['close'].iloc[-1]}")
             logger.info(f"接近布林下軌: {price_near_lower.iloc[-1]}, RSI超賣反轉: {rsi_condition.iloc[-1]}, 無明顯趨勢: {ma_slope_condition.iloc[-1]}")
             logger.info(f"逆勢策略做多信號: {entry_signal.iloc[-1]}")
             
@@ -236,7 +235,6 @@ class SignalGenerator:
             # 綜合判斷
             entry_signal = price_near_upper & rsi_condition & ma_slope_condition
 
-            logger.info(f"收盤價格: {df['close'].iloc[-1]}")
             logger.info(f"接近布林上軌: {price_near_upper.iloc[-1]}, RSI超買反轉: {rsi_condition.iloc[-1]}, 無明顯趨勢: {ma_slope_condition.iloc[-1]}")
             logger.info(f"逆勢策略做空信號: {entry_signal.iloc[-1]}")
             
@@ -269,7 +267,6 @@ class SignalGenerator:
             # 綜合判斷
             exit_signal = rsi_exit | price_exit
 
-            logger.info(f"收盤價格: {df['close'].iloc[-1]}")
             logger.info(f"RSI超買過熱: {rsi_exit.iloc[-1]}, 碰觸布林中軌: {price_exit.iloc[-1]}")
             logger.info(f"順勢策略做多平倉信號: {exit_signal.iloc[-1]}")
             
@@ -302,7 +299,6 @@ class SignalGenerator:
             # 綜合判斷
             exit_signal = rsi_exit | price_exit
 
-            logger.info(f"收盤價格: {df['close'].iloc[-1]}")
             logger.info(f"RSI超賣過冷: {rsi_exit.iloc[-1]}, 碰觸布林中軌: {price_exit.iloc[-1]}")
             logger.info(f"順勢策略做空平倉信號: {exit_signal.iloc[-1]}")
             
@@ -332,7 +328,6 @@ class SignalGenerator:
             # 綜合判斷
             exit_signal = price_exit | rsi_exit
 
-            logger.info(f"收盤價格: {df['close'].iloc[-1]}")
             logger.info(f"接近布林中軌: {price_exit.iloc[-1]}, RSI接近中性: {rsi_exit.iloc[-1]}")
             logger.info(f"逆勢策略做多平倉信號: {exit_signal.iloc[-1]}")
             
@@ -362,7 +357,6 @@ class SignalGenerator:
             # 綜合判斷
             exit_signal = price_exit | rsi_exit
 
-            logger.info(f"收盤價格: {df['close'].iloc[-1]}")
             logger.info(f"接近布林中軌: {price_exit.iloc[-1]}, RSI接近中性: {rsi_exit.iloc[-1]}")
             logger.info(f"逆勢策略做空平倉信號: {exit_signal.iloc[-1]}")
             

@@ -145,7 +145,7 @@ class RiskControl:
             volume_ok = self.check_volume_filter(df_15min)
             bandwidth_ok = self.check_bandwidth_filter(df_15min)
 
-            logger.info(f"策略切換器：趨勢濾網: {trend}, 成交量濾網: {volume_ok}, BB帶寬濾網: {bandwidth_ok}")
+            logger.info(f"策略切換器：趨勢濾網: {trend}, 成交量濾網: {volume_ok}, 布林帶寬濾網: {bandwidth_ok}")
             
             # 判斷策略
             if volume_ok and bandwidth_ok:
