@@ -1,8 +1,8 @@
 # 加密貨幣自動交易系統
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/timmy2426/Cryptocurrency-Automated-Trading-System)
-[![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/timmy2426/Cryptocurrency-Automated-Trading-System)&nbsp;
+[![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)&nbsp;
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-orange.svg)](https://www.gnu.org/licenses/gpl-3.0)&nbsp;
 
 ## 專案概述
 
