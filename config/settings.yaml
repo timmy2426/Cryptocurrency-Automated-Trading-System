@@ -1,6 +1,6 @@
 control:
-  testnet: true
-  debug: true
+  testnet: false
+  debug: false
 
 binance_api:
   base_endpoint: https://fapi.binance.com
