@@ -62,9 +62,9 @@ trading:
     - ATOMUSDT
   leverage: 5
   price_protect: true
-  activate_price_rate: 0.015
-  trailing_percent: 0.5 #百分比%
-  max_loss_percent: 0.005
+  activate_price_rate: 0.012
+  trailing_percent: 0.3 #百分比%
+  max_loss_percent: 0.01
   mean_reversion_tp: 0.01
   mean_reversion_sl: 0.005
 
@@ -74,7 +74,7 @@ risk_control:
   slippage_percent: 0.5 #百分比%
   max_holding_bars: 8
   max_daily_trades: 30
-  max_daily_loss: 0.03
+  max_daily_loss: 0.035
   consecutive_losses: 3
   cooldown_period: 3600
   min_bandwidth_threshold: 0.01

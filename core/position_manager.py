@@ -249,8 +249,8 @@ class PositionManager:
                 logger.info(f"交易對 {symbol} 不在標的列表中，跳過紀錄倉位信息")
                 return
                 
-            # 如果倉位不存在，創建新的倉位信息字典
-            if symbol not in self.positions:
+            # 如果為開倉單且倉位不存在，創建新的倉位信息字典
+            if symbol not in self.positions and not (position_data.reduce_only or position_data.close_position):
                 self.positions[symbol] = self._position_template.copy()  # 使用模板創建新的字典
                 self.positions[symbol]['symbol'] = symbol  # 更新交易對
 
@@ -373,7 +373,7 @@ class PositionManager:
         try:
             # 檢查交易對是否存在
             if symbol not in self.positions:
-                logger.error(f"交易對 {symbol} 不存在")
+                logger.info(f"交易對 {symbol} 不存在，開倉流程可能已中斷")
                 return
             
             with self.lock:
@@ -419,7 +419,7 @@ class PositionManager:
         try:
             # 檢查交易對是否存在
             if symbol not in self.positions:
-                logger.error(f"交易對 {symbol} 不存在")
+                logger.info(f"交易對 {symbol} 不存在，平倉流程可能已完成")
                 return
             
             with self.lock:
