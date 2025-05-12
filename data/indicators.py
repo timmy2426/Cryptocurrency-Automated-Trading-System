@@ -22,7 +22,8 @@ class TechnicalIndicators:
                 'rsi_average_window',
                 'ma_slope_window',
                 'atr_period',
-                'average_volume_window'
+                'average_volume_window',
+                'average_volume_scale'
             ]
             
             self.config = check_config_parameters(required_params)
@@ -222,6 +223,7 @@ class TechnicalIndicators:
         try:
             # 計算成交量移動平均
             avg_volume = df['volume'].rolling(window=self.config['average_volume_window']).mean()
+            avg_volume = avg_volume * self.config['average_volume_scale']
             return avg_volume
             
         except Exception as e:

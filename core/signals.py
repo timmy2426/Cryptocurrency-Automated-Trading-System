@@ -98,7 +98,7 @@ class SignalGenerator:
             # 1. 收盤價突破布林帶上軌
             price_break_upper = df['close'] > indicators['upper_band']
             
-            # 2. RSI > (rsi_overbought - rsi_momentum_offset) ，不過熱且呈現上升趨勢
+            # 2. RSI > (rsi_overbought - rsi_momentum_offset) ，尚未超買且呈現上升趨勢
             rsi_condition = (
                 (indicators['rsi'] > (self.config['rsi_overbought'] - self.config['rsi_momentum_offset'])) &
                 (indicators['rsi'] < (self.config['rsi_overbought'] + self.config['rsi_reversal_offset'])) &
@@ -137,7 +137,7 @@ class SignalGenerator:
             # 1. 收盤價跌破布林帶下軌
             price_break_lower = df['close'] < indicators['lower_band']
             
-            # 2. RSI < (rsi_oversold + rsi_momentum_offset) ，不過冷且呈現下降趨勢
+            # 2. RSI < (rsi_oversold + rsi_momentum_offset) ，尚未超賣且呈現下降趨勢
             rsi_condition = (
                 (indicators['rsi'] < (self.config['rsi_oversold'] + self.config['rsi_momentum_offset'])) &
                 (indicators['rsi'] > (self.config['rsi_oversold'] - self.config['rsi_reversal_offset'])) &
@@ -323,7 +323,7 @@ class SignalGenerator:
             price_exit = abs(df['close'] - indicators['middle_band']) / indicators['middle_band'] <= self.config['bb_price_threshold']
             
             # 2. RSI 回升至約 50 上下
-            rsi_exit = abs(indicators['rsi'] - 50) <= 3
+            rsi_exit = abs(indicators['rsi'] - 50) <= 2
             
             # 綜合判斷
             exit_signal = price_exit | rsi_exit
@@ -352,7 +352,7 @@ class SignalGenerator:
             price_exit = abs(df['close'] - indicators['middle_band']) / indicators['middle_band'] <= self.config['bb_price_threshold']
             
             # 2. RSI 降至約 50 上下
-            rsi_exit = abs(indicators['rsi'] - 50) <= 3
+            rsi_exit = abs(indicators['rsi'] - 50) <= 2
             
             # 綜合判斷
             exit_signal = price_exit | rsi_exit

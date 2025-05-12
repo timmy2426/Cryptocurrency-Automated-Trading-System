@@ -254,69 +254,72 @@ class PositionManager:
                 self.positions[symbol] = self._position_template.copy()  # 使用模板創建新的字典
                 self.positions[symbol]['symbol'] = symbol  # 更新交易對
 
-            # 更新訂單結果
-            if isinstance(position_data, Order) and position_data.status in [OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED]:
-                if position_data.reduce_only  or position_data.close_position: # 平倉單成交
-                    self.positions[symbol]['side'] = position_data.side.value
-                    self.positions[symbol]['close_time'] = position_data.timestamp
-                    self.positions[symbol]['close_reason'] = BinanceConverter.get_close_reason(position_data)
-                    if self.positions[symbol]['close_price'] == Decimal('0'):
-                        self.positions[symbol]['close_price'] = position_data.avg_price
-                        self.positions[symbol]['close_amt'] = position_data.last_filled_qty
-                    elif abs(position_data.executed_qty) > abs(self.positions[symbol]['close_amt']):
-                        total_cost = self.positions[symbol]['close_price'] * self.positions[symbol]['close_amt'] + position_data.avg_price * position_data.last_filled_qty
-                        self.positions[symbol]['close_amt'] += position_data.last_filled_qty
-                        self.positions[symbol]['close_price'] = self._match_precision(total_cost / self.positions[symbol]['close_amt'], position_data.avg_price)
-                    self.positions[symbol]['close_size'] = self._match_precision(self.positions[symbol]['close_amt'] * self.positions[symbol]['close_price'], position_data.last_filled_qty)
-                    self.positions[symbol]['close_size'] *= Decimal('-1') if self.positions[symbol]['side'] == 'SELL' else Decimal('1')
-                    self.positions[symbol]['pnl'] += position_data.realized_profit
-                    if self.positions[symbol]['close_size'] != Decimal('0') and self.positions[symbol]['pnl'] != Decimal('0'):
-                        self.positions[symbol]['pnl_percentage'] = (
-                            (self.positions[symbol]['pnl'] / abs(self.positions[symbol]['close_size'])) * Decimal('100')
-                            ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            #更新倉位信息
+            position = self.positions.get(symbol)
+            if position:
+                # 更新訂單結果
+                if isinstance(position_data, Order) and position_data.status in [OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED]:
+                    if position_data.reduce_only  or position_data.close_position: # 平倉單成交
+                        position['side'] = position_data.side.value
+                        position['close_time'] = position_data.timestamp
+                        position['close_reason'] = BinanceConverter.get_close_reason(position_data)
+                        if position['close_price'] == Decimal('0'):
+                            position['close_price'] = position_data.avg_price
+                            position['close_amt'] = position_data.last_filled_qty
+                        elif abs(position_data.executed_qty) > abs(position['close_amt']):
+                            total_cost = position['close_price'] * position['close_amt'] + position_data.avg_price * position_data.last_filled_qty
+                            position['close_amt'] += position_data.last_filled_qty
+                            position['close_price'] = self._match_precision(total_cost / position['close_amt'], position_data.avg_price)
+                        position['close_size'] = self._match_precision(position['close_amt'] * position['close_price'], position_data.last_filled_qty)
+                        position['close_size'] *= Decimal('-1') if position['side'] == 'SELL' else Decimal('1')
+                        position['pnl'] += position_data.realized_profit
+                        if position['close_size'] != Decimal('0') and position['pnl'] != Decimal('0'):
+                            position['pnl_percentage'] = (
+                                (position['pnl'] / abs(position['close_size'])) * Decimal('100')
+                                ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                        
+                    else: # 開倉單成交
+                        position['side'] = position_data.side.value
+                        position['open_time'] = position_data.timestamp
+                        if position['open_price'] == Decimal('0'):
+                            position['open_price'] = position_data.avg_price
+                            position['open_amt'] = position_data.last_filled_qty
+                        else:
+                            total_cost = position['open_price'] * position['open_amt'] + position_data.avg_price * position_data.last_filled_qty
+                            position['open_amt'] += position_data.last_filled_qty
+                            position['open_price'] = self._match_precision(total_cost / position['open_amt'], position_data.avg_price)
+                        position['open_size'] = self._match_precision(position['open_amt'] * position['open_price'], position_data.last_filled_qty)
+                        position['open_size'] *= Decimal('-1') if position['side'] == 'SELL' else Decimal('1')
+
+                # 更新開倉信息
+                if update_config and 'strategy' in update_config:
+                    position['strategy'] = update_config['strategy']
+                if update_config and 'stop_loss' in update_config:
+                    position['stop_loss'] = update_config['stop_loss']
+                if update_config and 'take_profit' in update_config:
+                    position['take_profit'] = update_config['take_profit']
+                if update_config and 'trailing_stop' in update_config:
+                    position['trailing_stop'] = update_config['trailing_stop']
+                if update_config and 'price_rate' in update_config:
+                    position['price_rate'] = update_config['price_rate']
+
+                logger.info(f"更新倉位信息成功: {symbol}")
+                logger.info(f"倉位信息: {position}")
                     
-                else: # 開倉單成交
-                    self.positions[symbol]['side'] = position_data.side.value
-                    self.positions[symbol]['open_time'] = position_data.timestamp
-                    if self.positions[symbol]['open_price'] == Decimal('0'):
-                        self.positions[symbol]['open_price'] = position_data.avg_price
-                        self.positions[symbol]['open_amt'] = position_data.last_filled_qty
-                    else:
-                        total_cost = self.positions[symbol]['open_price'] * self.positions[symbol]['open_amt'] + position_data.avg_price * position_data.last_filled_qty
-                        self.positions[symbol]['open_amt'] += position_data.last_filled_qty
-                        self.positions[symbol]['open_price'] = self._match_precision(total_cost / self.positions[symbol]['open_amt'], position_data.avg_price)
-                    self.positions[symbol]['open_size'] = self._match_precision(self.positions[symbol]['open_amt'] * self.positions[symbol]['open_price'], position_data.last_filled_qty)
-                    self.positions[symbol]['open_size'] *= Decimal('-1') if self.positions[symbol]['side'] == 'SELL' else Decimal('1')
-
-            # 更新開倉信息
-            if update_config and 'strategy' in update_config:
-                self.positions[symbol]['strategy'] = update_config['strategy']
-            if update_config and 'stop_loss' in update_config:
-                self.positions[symbol]['stop_loss'] = update_config['stop_loss']
-            if update_config and 'take_profit' in update_config:
-                self.positions[symbol]['take_profit'] = update_config['take_profit']
-            if update_config and 'trailing_stop' in update_config:
-                self.positions[symbol]['trailing_stop'] = update_config['trailing_stop']
-            if update_config and 'price_rate' in update_config:
-                self.positions[symbol]['price_rate'] = update_config['price_rate']
-
-            logger.info(f"更新倉位信息成功: {symbol}")
-            logger.info(f"倉位信息: {self.positions[symbol]}")
-                
-            # 判斷開倉/平倉是否完成
-            if position_data.status == OrderStatus.FILLED:
-                if position_data.reduce_only or position_data.close_position:
-                    self.close_position_complete(symbol)
-                elif self.positions[symbol]['strategy'] and self.positions[symbol]['stop_loss']:
-                    if self.positions[symbol]['take_profit'] or self.positions[symbol]['trailing_stop']:
-                        self.open_position_complete(symbol)
-            elif position_data.status in [OrderStatus.CANCELED, OrderStatus.EXPIRED]:
-                if position_data.executed_qty:
+                # 判斷開倉/平倉是否完成
+                if position_data.status == OrderStatus.FILLED:
                     if position_data.reduce_only or position_data.close_position:
                         self.close_position_complete(symbol)
-                    elif self.positions[symbol]['strategy'] and self.positions[symbol]['stop_loss']:
-                        if self.positions[symbol]['take_profit'] or self.positions[symbol]['trailing_stop']:
+                    elif position['strategy'] and position['stop_loss']:
+                        if position['take_profit'] or position['trailing_stop']:
                             self.open_position_complete(symbol)
+                elif position_data.status in [OrderStatus.CANCELED, OrderStatus.EXPIRED]:
+                    if position_data.executed_qty:
+                        if position_data.reduce_only or position_data.close_position:
+                            self.close_position_complete(symbol)
+                        elif position['strategy'] and position['stop_loss']:
+                            if position['take_profit'] or position['trailing_stop']:
+                                self.open_position_complete(symbol)
         
         except Exception as e:
             logger.error(f"更新倉位信息失敗: {str(e)}")
@@ -684,3 +687,4 @@ class PositionManager:
         except Exception as e:
             logger.error(f"檢查滑價比率失敗: {str(e)}")
             return False
+        
