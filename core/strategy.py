@@ -38,7 +38,7 @@ class Strategy:
             # 1. 使用 risk_control 中的 select_strategy 方法選擇策略
             strategy_type = self.risk_control.select_strategy(df_15min, df_1h, df_4h)
 
-            logger.info(f"策略選擇器：選擇策略: {strategy_type}")
+            logger.info(f"策略選擇器： {strategy_type}")
             
             # 若為 "no_trade" 則直接返回
             if strategy_type == "no_trade":
@@ -50,8 +50,8 @@ class Strategy:
             # 2. 根據策略類型檢查信號
             if strategy_type == "trend":
                 # 檢查順勢開倉信號
-                long_signal = self.signal_generator.is_trend_long_entry(df_15min, indicators).iloc[-1]
-                short_signal = self.signal_generator.is_trend_short_entry(df_15min, indicators).iloc[-1]
+                long_signal = self.signal_generator.is_trend_long_entry(df_15min, indicators).iloc[-2]
+                short_signal = self.signal_generator.is_trend_short_entry(df_15min, indicators).iloc[-2]
                 
                 if long_signal and self.position_manager.check_slippage(symbol):
                     return "trend_long"
@@ -60,8 +60,8 @@ class Strategy:
                     
             elif strategy_type == "mean_reversion":
                 # 檢查逆勢開倉信號
-                long_signal = self.signal_generator.is_mean_rev_long_entry(df_15min, indicators).iloc[-1]
-                short_signal = self.signal_generator.is_mean_rev_short_entry(df_15min, indicators).iloc[-1]
+                long_signal = self.signal_generator.is_mean_rev_long_entry(df_15min, indicators).iloc[-2]
+                short_signal = self.signal_generator.is_mean_rev_short_entry(df_15min, indicators).iloc[-2]
                 
                 if long_signal and self.position_manager.check_slippage(symbol):
                     return "mean_rev_long"

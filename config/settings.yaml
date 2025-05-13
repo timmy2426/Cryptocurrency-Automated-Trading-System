@@ -25,14 +25,14 @@ index:
   rsi_overbought: 60
   rsi_oversold: 40
   rsi_momentum_offset: 5
-  rsi_reversal_offset: 20
+  rsi_reversal_offset: 10
   rsi_average_window: 3
   ma_slow_length: 50
   ma_slope_window: 6
   ma_slope_threshold: 0.005
   atr_period: 14
   average_volume_window: 6
-  average_volume_scale: 0.6
+  average_volume_scale: 0.8
 
 trading:
   symbol_list:
@@ -61,16 +61,21 @@ trading:
     - POLUSDT
     - ARBUSDT
     - ATOMUSDT
+    - INITUSDT
+    - WLDUSDT
+    - ONDOUSDT
+    - PARTIUSDT
+    - LAYERUSDT
   leverage: 5
   price_protect: true
-  activate_price_rate: 0.012
-  trailing_percent: 0.3 #百分比%
-  max_loss_percent: 0.01
-  mean_reversion_tp: 0.01
-  mean_reversion_sl: 0.005
+  activate_price_rate: 0.014
+  trailing_percent: 0.4 #百分比%
+  max_loss_percent: 0.012
+  mean_reversion_tp: 0.016
+  mean_reversion_sl: 0.008
 
 risk_control:
-  risk_per_trade: 0.002
+  risk_per_trade: 0.005
   max_margin_usage: 0.7
   slippage_percent: 0.5 #百分比%
   max_holding_bars: 12
@@ -78,4 +83,4 @@ risk_control:
   max_daily_loss: 0.035
   consecutive_losses: 3
   cooldown_period: 3600
-  min_bandwidth_threshold: 0.01
+  min_bandwidth_threshold: 0.02

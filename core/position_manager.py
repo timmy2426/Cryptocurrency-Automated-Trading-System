@@ -604,7 +604,7 @@ class PositionManager:
             # 計算 ATR 百分比
             indicators = TechnicalIndicators()
             atr_percentage = indicators.calculate_atr_percentage(df)
-            current_atr_percentage = float(atr_percentage.iloc[-1])
+            current_atr_percentage = float(atr_percentage.iloc[-2])
             
             # 根據 ATR 百分比調整倉位大小
             if current_atr_percentage > 0.01:  # ATR 百分比大於 1%

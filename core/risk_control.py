@@ -61,9 +61,9 @@ class RiskControl:
                 
                 # 判斷趨勢
                 slope_threshold = self.config['ma_slope_threshold']
-                if (ma_fast.iloc[-1] > ma_slow.iloc[-1]) and (ma_fast_slope.iloc[-1] > slope_threshold) and (ma_slow_slope.iloc[-1] > 0):
+                if (ma_fast.iloc[-2] > ma_slow.iloc[-2]) and (ma_fast_slope.iloc[-2] > slope_threshold) and (ma_slow_slope.iloc[-2] > 0):
                     trend_score = 1
-                elif (ma_fast.iloc[-1] < ma_slow.iloc[-1]) and (ma_fast_slope.iloc[-1] < -slope_threshold) and (ma_slow_slope.iloc[-1] < 0):
+                elif (ma_fast.iloc[-2] < ma_slow.iloc[-2]) and (ma_fast_slope.iloc[-2] < -slope_threshold) and (ma_slow_slope.iloc[-2] < 0):
                     trend_score = -1
                 else:
                     trend_score = 0
@@ -97,9 +97,9 @@ class RiskControl:
         try:
             # 計算平均成交量
             avg_volume = self.indicators.calculate_average_volume(df)
-            
+
             # 判斷最新的完整K棒的成交量是否大於平均成交量
-            return df['volume'].iloc[-1] > avg_volume.iloc[-1]
+            return df['volume'].iloc[-2] > avg_volume.iloc[-2]
 
         except Exception as e:
             logger.error(f"檢查成交量濾網失敗: {str(e)}")
@@ -120,9 +120,9 @@ class RiskControl:
             
             # 計算布林帶寬度
             bandwidth = self.indicators.calculate_bollinger_bandwidth(upper_band, lower_band, middle_band)
-            
+
             # 判斷帶寬是否大於閾值
-            return bandwidth.iloc[-1] > self.config['min_bandwidth_threshold']
+            return bandwidth.iloc[-2] > self.config['min_bandwidth_threshold']
             
         except Exception as e:
             logger.error(f"檢查BB帶寬濾網失敗: {str(e)}")
@@ -145,7 +145,7 @@ class RiskControl:
             volume_ok = self.check_volume_filter(df_15min)
             bandwidth_ok = self.check_bandwidth_filter(df_15min)
 
-            logger.info(f"策略切換器：趨勢濾網: {trend}, 成交量濾網: {volume_ok}, 布林帶寬濾網: {bandwidth_ok}")
+            logger.info(f"風險控制器：趨勢濾網: {trend}, 成交量濾網: {volume_ok}, 布林帶寬濾網: {bandwidth_ok}")
             
             # 判斷策略
             if volume_ok and bandwidth_ok:

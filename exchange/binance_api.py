@@ -634,7 +634,7 @@ class BinanceAPI:
             List[Dict]: K線數據
         """
         try:
-            return self.client.klines(symbol=symbol, interval=interval, limit=limit)
+            return self.client.continuous_klines(pair=symbol, contractType='PERPETUAL', interval=interval, limit=limit)
         except Exception as e:
             logger.error(f"獲取K線數據失敗: {str(e)}")
             raise

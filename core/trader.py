@@ -74,6 +74,7 @@ class Trader:
             # 更新帳戶信息
             self.position_manager.update_account_info()
             positions = self.position_manager.account_info.get('positions', [])
+            time.sleep(10) # 等待平台伺服器K線結算完成
             
             # 處理已存在的倉位
             for symbol in self.symbol_list:
@@ -126,20 +127,20 @@ class Trader:
             # 根據開倉策略檢查出場信號
             logger.info('-' * 100)
             logger.info(f"檢查 {symbol} 平倉信號")
-            logger.info(f"收盤價格: {df_15min['close'].iloc[-1]}")
+            logger.info(f"收盤價格: {df_15min['close'].iloc[-2]}")
 
             should_close = False
             if position['strategy'] != None:
                 if position['strategy'].startswith("trend"):
                     if position['side'] == "BUY":
-                        should_close = self.signal_generator.is_trend_long_exit(df_15min, indicators).iloc[-1]
+                        should_close = self.signal_generator.is_trend_long_exit(df_15min, indicators).iloc[-2]
                     else:
-                        should_close = self.signal_generator.is_trend_short_exit(df_15min, indicators).iloc[-1]
+                        should_close = self.signal_generator.is_trend_short_exit(df_15min, indicators).iloc[-2]
                 else:  # mean_reversion
                     if position['side'] == "BUY":
-                        should_close = self.signal_generator.is_mean_rev_long_exit(df_15min, indicators).iloc[-1]
+                        should_close = self.signal_generator.is_mean_rev_long_exit(df_15min, indicators).iloc[-2]
                     else:
-                        should_close = self.signal_generator.is_mean_rev_short_exit(df_15min, indicators).iloc[-1]
+                        should_close = self.signal_generator.is_mean_rev_short_exit(df_15min, indicators).iloc[-2]
 
             # 開倉不完整的自我修正機制
             if (self.position_manager.positions[symbol]['open_time'] == None or
@@ -197,7 +198,7 @@ class Trader:
             # 檢查開倉信號
             logger.info('-' * 100)
             logger.info(f"檢查 {symbol} 開倉信號")
-            logger.info(f"收盤價格: {df_15min['close'].iloc[-1]}")
+            logger.info(f"收盤價格: {df_15min['close'].iloc[-2]}， 成交量: {df_15min['volume'].iloc[-2]}")
 
             selected_strategy = self.strategy.select(symbol, df_15min, df_1h, df_4h)
 
