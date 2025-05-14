@@ -29,7 +29,7 @@ index:
   rsi_average_window: 3
   ma_slow_length: 50
   ma_slope_window: 6
-  ma_slope_threshold: 0.005
+  ma_slope_threshold: 0.003
   atr_period: 14
   average_volume_window: 6
   average_volume_scale: 0.8
@@ -83,4 +83,4 @@ risk_control:
   max_daily_loss: 0.035
   consecutive_losses: 3
   cooldown_period: 3600
-  min_bandwidth_threshold: 0.02
+  min_bandwidth_threshold: 0.01

@@ -2,7 +2,7 @@
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/timmy2426/Cryptocurrency-Automated-Trading-System)&nbsp;
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)&nbsp;
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-orange.svg)](https://www.gnu.org/licenses/gpl-3.0)&nbsp;
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-orange.svg)](https://www.gnu.org/licenses/agpl-3.0.html)&nbsp;
 
 ## 專案概述
 
@@ -125,7 +125,7 @@
 ## 技術特點
 
 - 模組化設計
-- 非同步處理
+- 多線程機制
 - 自動重連機制
 - 完整的錯誤處理
 - 詳細的日誌記錄
@@ -169,8 +169,8 @@
 
 ## 授權條款
 
-本專案依據 [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html) 授權釋出。  
-您可以自由使用、修改與再散布本程式碼，但必須遵守 GPL v3 授權條款，包括開放原始碼、保留原作者授權聲明等義務。
+本專案依據 [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.html) 授權釋出。  
+您可以自由使用、修改與再散布本程式碼，但必須遵守 AGPL v3 授權條款，包括開放原始碼、保留原作者授權聲明，以及若透過網路提供本程式所建置的服務，也需提供對應的原始碼。
 
 ## 免責聲明
 
