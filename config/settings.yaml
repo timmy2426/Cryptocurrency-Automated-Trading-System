@@ -18,7 +18,7 @@ binance_api:
 index:
   bb_length: 20
   bb_mult: 1.5
-  bb_change_rate: 0.15
+  bb_change_rate: 0.2
   bb_change_rate_window: 3
   bb_price_threshold: 0.002
   rsi_length: 14
@@ -68,9 +68,9 @@ trading:
     - LAYERUSDT
   leverage: 5
   price_protect: true
-  activate_price_rate: 0.014
-  trailing_percent: 0.4 #百分比%
-  max_loss_percent: 0.012
+  activate_price_rate: 0.013
+  trailing_percent: 1 #百分比%
+  max_loss_percent: 0.01
   mean_reversion_tp: 0.016
   mean_reversion_sl: 0.008
 
@@ -83,4 +83,4 @@ risk_control:
   max_daily_loss: 0.035
   consecutive_losses: 3
   cooldown_period: 3600
-  min_bandwidth_threshold: 0.01
+  min_bandwidth_threshold: 0.02

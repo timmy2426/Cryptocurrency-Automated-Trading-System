@@ -233,12 +233,23 @@ def main():
                 logger.info(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - 執行交易檢查")
                 
                 # 執行交易機器人
-                bot.start()
+                max_retries = 10
+                retry_count = 0
+                while retry_count < max_retries:
+                    try:
+                        bot.start()
+                        break
+                    except Exception as e:
+                        retry_count += 1
+                        logger.warning(f"交易機器人執行失敗，第 {retry_count} 次重試")
+                        if retry_count >= max_retries:
+                            logger.error(f"交易機器人執行失敗，已達到最大重試次數")
+                            logger.error(f"交易機器人執行失敗: {str(e)}")
+                        time.sleep(30)
                 
             except Exception as e:
-                logger.error(f"交易機器人執行失敗: {str(e)}")
-                time.sleep(60)  # 發生錯誤時等待1分鐘再重試
-                
+                logger.error(f"主循環執行失敗: {str(e)}")
+    
     except KeyboardInterrupt:
         logger.info("收到鍵盤中斷信號")
     except Exception as e:

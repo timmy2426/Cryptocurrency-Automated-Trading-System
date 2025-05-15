@@ -2,6 +2,7 @@ from discord_webhook import DiscordWebhook, DiscordEmbed
 from .message_format import MessageFormatter
 from utils.config import check_config_parameters
 import logging
+import time
 
 # 設置日誌
 logger = logging.getLogger(__name__)
@@ -48,7 +49,21 @@ class SendMessage:
         try:
             webhook = DiscordWebhook(url=self.webhook_url)
             webhook.add_embed(embed)
-            webhook.execute()
+
+            max_retries = 12
+            retry_count = 0
+            while retry_count < max_retries:
+                try:
+                    webhook.execute()
+                    break
+                except Exception as e:
+                    retry_count += 1
+                    logger.warning(f"發送{message_type}訊息失敗，第 {retry_count} 次重試")
+                    if retry_count >= max_retries:
+                        logger.error(f"發送{message_type}訊息失敗，已達到最大重試次數")
+                        raise
+                    time.sleep(5)
+
         except Exception as e:
             logger.error(f"發送{message_type}訊息失敗: {str(e)}")
         
