@@ -102,32 +102,6 @@ class TechnicalIndicators:
             logger.error(f"計算布林帶寬度變化率失敗: {str(e)}")
             raise
             
-    def is_price_near_band(self, price: float, upper_band: float, lower_band: float) -> Tuple[bool, bool]:
-        """判斷價格是否靠近布林帶上下軌
-        
-        Args:
-            price: 當前價格
-            upper_band: 布林帶上軌
-            lower_band: 布林帶下軌
-            
-        Returns:
-            Tuple[bool, bool]: (是否靠近上軌, 是否靠近下軌)
-        """
-        try:
-            # 計算價格與上下軌的距離百分比
-            upper_distance = abs(price - upper_band) / upper_band
-            lower_distance = abs(price - lower_band) / lower_band
-            
-            # 判斷是否在閾值範圍內
-            near_upper = upper_distance <= self.config['bb_price_threshold']
-            near_lower = lower_distance <= self.config['bb_price_threshold']
-            
-            return near_upper, near_lower
-            
-        except Exception as e:
-            logger.error(f"判斷價格位置失敗: {str(e)}")
-            raise
-            
     def calculate_rsi(self, df: pd.DataFrame) -> pd.Series:
         """計算RSI
         

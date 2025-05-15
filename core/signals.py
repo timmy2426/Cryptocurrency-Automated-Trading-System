@@ -173,11 +173,11 @@ class SignalGenerator:
             pd.Series: 買入信號序列
         """
         try:
-            # 1. 價格觸及布林帶下軌 ± bb_price_threshold 區間
-            price_near_lower = pd.Series([
-                self.indicators.is_price_near_band(price, upper, lower)[1]
-                for price, upper, lower in zip(df['close'], indicators['upper_band'], indicators['lower_band'])
-            ], index=df.index)
+            # 1. 價格接近或超過布林帶下軌
+            price_near_lower = (
+                (abs(df['close'] - indicators['lower_band']) / indicators['lower_band'] <= self.config['bb_price_threshold']) | 
+                (df['close'] < indicators['lower_band'])
+            )
             
             # 2. RSI < rsi_oversold 且出現反轉訊號
             rsi_condition = (
@@ -214,11 +214,11 @@ class SignalGenerator:
             pd.Series: 賣出信號序列
         """
         try:
-            # 1. 價格觸及布林帶上軌 ± bb_price_threshold 區間
-            price_near_upper = pd.Series([
-                self.indicators.is_price_near_band(price, upper, lower)[0]
-                for price, upper, lower in zip(df['close'], indicators['upper_band'], indicators['lower_band'])
-            ], index=df.index)
+            # 1. 價格接近或超過布林帶上軌
+            price_near_upper = (
+                (abs(df['close'] - indicators['upper_band']) / indicators['upper_band'] <= self.config['bb_price_threshold']) | 
+                (df['close'] > indicators['upper_band'])
+            )
             
             # 2. RSI > rsi_overbought 且出現反轉訊號
             rsi_condition = (
