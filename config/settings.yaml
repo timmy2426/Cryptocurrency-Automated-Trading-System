@@ -18,7 +18,7 @@ binance_api:
 index:
   bb_length: 20
   bb_mult: 1.5
-  bb_change_rate: 0.3
+  bb_change_rate: 0.2
   bb_change_rate_window: 3
   bb_price_threshold: 0.002
   rsi_length: 14
@@ -29,7 +29,8 @@ index:
   rsi_average_window: 3
   ma_slow_length: 50
   ma_slope_window: 6
-  ma_slope_threshold: 0.003
+  ma_slope_trend_threshold: 0.004
+  ma_slope_sideway_threshold: 0.002
   atr_period: 14
   average_volume_window: 6
   average_volume_scale: 0.8

@@ -35,7 +35,7 @@ class Strategy:
             str: 策略名稱，若無合適策略則返回 "no_trade"
         """
         try:
-            # 1. 使用 risk_control 中的 select_strategy 方法選擇策略
+            # 使用 risk_control 中的 select_strategy 方法選擇策略
             strategy_type = self.risk_control.select_strategy(df_15min, df_1h, df_4h)
 
             logger.info(f"策略選擇器： {strategy_type}")
@@ -47,27 +47,43 @@ class Strategy:
             # 計算技術指標
             indicators = self.signal_generator.calculate_indicators(df_15min)
             
-            # 2. 根據策略類型檢查信號
+            # 根據策略類型檢查信號
             if strategy_type == "trend":
                 # 檢查順勢開倉信號
-                long_signal = self.signal_generator.is_trend_long_entry(df_15min, indicators).iloc[-2]
-                short_signal = self.signal_generator.is_trend_short_entry(df_15min, indicators).iloc[-2]
+                trend_long_signal = self.signal_generator.is_trend_long_entry(df_15min, indicators).iloc[-2]
+                trend_short_signal = self.signal_generator.is_trend_short_entry(df_15min, indicators).iloc[-2]
                 
-                if long_signal and self.position_manager.check_slippage(symbol):
+                if trend_long_signal and self.position_manager.check_slippage(symbol):
                     return "trend_long"
-                elif short_signal and self.position_manager.check_slippage(symbol):
+                elif trend_short_signal and self.position_manager.check_slippage(symbol):
                     return "trend_short"
                     
             elif strategy_type == "mean_reversion":
                 # 檢查逆勢開倉信號
-                long_signal = self.signal_generator.is_mean_rev_long_entry(df_15min, indicators).iloc[-2]
-                short_signal = self.signal_generator.is_mean_rev_short_entry(df_15min, indicators).iloc[-2]
+                mean_rev_long_signal = self.signal_generator.is_mean_rev_long_entry(df_15min, indicators).iloc[-2]
+                mean_rev_short_signal = self.signal_generator.is_mean_rev_short_entry(df_15min, indicators).iloc[-2]
                 
-                if long_signal and self.position_manager.check_slippage(symbol):
+                if mean_rev_long_signal and self.position_manager.check_slippage(symbol):
                     return "mean_rev_long"
-                elif short_signal and self.position_manager.check_slippage(symbol):
+                elif mean_rev_short_signal and self.position_manager.check_slippage(symbol):
                     return "mean_rev_short"
                     
+            elif strategy_type == "both":
+                # 檢查順勢和逆勢開倉信號
+                trend_long_signal = self.signal_generator.is_trend_long_entry(df_15min, indicators).iloc[-2]
+                trend_short_signal = self.signal_generator.is_trend_short_entry(df_15min, indicators).iloc[-2]
+                mean_rev_long_signal = self.signal_generator.is_mean_rev_long_entry(df_15min, indicators).iloc[-2]
+                mean_rev_short_signal = self.signal_generator.is_mean_rev_short_entry(df_15min, indicators).iloc[-2]
+                
+                if trend_long_signal and self.position_manager.check_slippage(symbol):
+                    return "trend_long"
+                elif trend_short_signal and self.position_manager.check_slippage(symbol):
+                    return "trend_short"
+                elif mean_rev_long_signal and self.position_manager.check_slippage(symbol):
+                    return "mean_rev_long"
+                elif mean_rev_short_signal and self.position_manager.check_slippage(symbol):
+                    return "mean_rev_short"
+                
             return "no_trade"
 
         except Exception as e:

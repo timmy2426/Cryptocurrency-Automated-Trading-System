@@ -17,7 +17,8 @@ class RiskControl:
             required_params = [
                 'bb_length',
                 'ma_slow_length',
-                'ma_slope_threshold',
+                'ma_slope_trend_threshold',
+                'ma_slope_sideway_threshold',
                 'min_bandwidth_threshold'
             ]
             
@@ -44,14 +45,14 @@ class RiskControl:
             df_4h: 4小時K線數據
             
         Returns:
-            str: 趨勢狀態，'uptrend'/'downtrend'/'sideway'
+            str: 趨勢狀態，'trend'/'neutral'/'sideway'
         """
         try:
             # 計算各時間框架的趨勢分數
-            trend_scores = []
+            scores = []
             
             for df in [df_15min, df_1h, df_4h]:
-                # 計算MA20和MA_slow
+                # 計算 ma_fast 和 ma_slow
                 ma_fast = self.indicators.calculate_sma(df, self.config['bb_length'])
                 ma_slow = self.indicators.calculate_sma(df, self.config['ma_slow_length'])
                 
@@ -60,26 +61,28 @@ class RiskControl:
                 ma_slow_slope = self.indicators.calculate_ma_slope(ma_slow)
                 
                 # 判斷趨勢
-                slope_threshold = self.config['ma_slope_threshold']
-                if (ma_fast.iloc[-2] > ma_slow.iloc[-2]) and (ma_fast_slope.iloc[-2] > slope_threshold) and (ma_slow_slope.iloc[-2] > 0):
-                    trend_score = 1
-                elif (ma_fast.iloc[-2] < ma_slow.iloc[-2]) and (ma_fast_slope.iloc[-2] < -slope_threshold) and (ma_slow_slope.iloc[-2] < 0):
-                    trend_score = -1
+                trend_threshold = self.config['ma_slope_trend_threshold']
+                sideway_threshold = self.config['ma_slope_sideway_threshold']
+
+                if abs(ma_fast_slope.iloc[-2]) > trend_threshold and abs(ma_slow_slope.iloc[-2]) > sideway_threshold:
+                    score = 1
+                elif abs(ma_fast_slope.iloc[-2]) < sideway_threshold and abs(ma_slow_slope.iloc[-2]) < trend_threshold:
+                    score = -1
                 else:
-                    trend_score = 0
+                    score = 0
                     
-                trend_scores.append(trend_score)
+                scores.append(score)
                 
             # 計算加權總分
-            total_score = (trend_scores[0] * 3) + (trend_scores[1] * 2) + (trend_scores[2] * 1)
+            total_score = (scores[0] * 3) + (scores[1] * 2) + (scores[2] * 1)
             
             # 判斷趨勢
             if total_score >= 4:
-                return 'uptrend'
+                return 'trend'
             elif total_score <= -4:
-                return 'downtrend'
-            else:
                 return 'sideway'
+            else:
+                return 'neutral'
                 
         except Exception as e:
             logger.error(f"檢查趨勢濾網失敗: {str(e)}")
@@ -149,10 +152,12 @@ class RiskControl:
             
             # 判斷策略
             if volume_ok and bandwidth_ok:
-                if trend in ['uptrend', 'downtrend']:
+                if trend == 'trend':
                     return 'trend'
                 elif trend == 'sideway':
                     return 'mean_reversion'
+                elif trend == 'neutral':
+                    return 'both'
                     
             return 'no_trade'
             
