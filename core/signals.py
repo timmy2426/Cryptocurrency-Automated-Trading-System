@@ -100,7 +100,7 @@ class SignalGenerator:
             # 2. RSI > (rsi_overbought - rsi_momentum_offset) ，尚未超買且呈現上升趨勢
             rsi_condition = (
                 (indicators['rsi'] > (self.config['rsi_overbought'] - self.config['rsi_momentum_offset'])) &
-                (indicators['rsi'] < (self.config['rsi_overbought'] + self.config['rsi_reversal_offset'])) &
+                (indicators['rsi'] < self.config['rsi_overbought']) &
                 (indicators['rsi'] > indicators['avg_rsi'])
             )
             
@@ -139,7 +139,7 @@ class SignalGenerator:
             # 2. RSI < (rsi_oversold + rsi_momentum_offset) ，尚未超賣且呈現下降趨勢
             rsi_condition = (
                 (indicators['rsi'] < (self.config['rsi_oversold'] + self.config['rsi_momentum_offset'])) &
-                (indicators['rsi'] > (self.config['rsi_oversold'] - self.config['rsi_reversal_offset'])) &
+                (indicators['rsi'] > self.config['rsi_oversold']) &
                 (indicators['rsi'] < indicators['avg_rsi'])
             )
             
@@ -184,15 +184,10 @@ class SignalGenerator:
                 (indicators['rsi'] > indicators['rsi'].shift(1))
             )
             
-            # 3. 布林通道寬度變化率小於閾值
-            bandwidth_change_condition = (
-                (abs(indicators['bandwidth_change']) < self.config['bb_change_rate'])
-            )
-            
             # 綜合判斷
-            entry_signal = price_near_lower & rsi_condition & bandwidth_change_condition
+            entry_signal = price_near_lower & rsi_condition
 
-            logger.info(f"收盤價接近布林下軌: {price_near_lower.iloc[-2]}, RSI超賣反轉: {rsi_condition.iloc[-2]}, 布林帶寬無擴張: {bandwidth_change_condition.iloc[-2]}")
+            logger.info(f"收盤價接近布林下軌: {price_near_lower.iloc[-2]}, RSI超賣反轉: {rsi_condition.iloc[-2]}")
             logger.info(f"逆勢策略做多信號: {entry_signal.iloc[-2]}")
             
             return entry_signal
@@ -224,15 +219,10 @@ class SignalGenerator:
                 (indicators['rsi'] < indicators['rsi'].shift(1))
             )
             
-            # 3. 布林通道寬度變化率小於閾值
-            bandwidth_change_condition = (
-                (abs(indicators['bandwidth_change']) < self.config['bb_change_rate'])
-            )
-            
             # 綜合判斷
-            entry_signal = price_near_upper & rsi_condition & bandwidth_change_condition
+            entry_signal = price_near_upper & rsi_condition
 
-            logger.info(f"收盤價接近布林上軌: {price_near_upper.iloc[-2]}, RSI超買反轉: {rsi_condition.iloc[-2]}, 布林帶寬無擴張: {bandwidth_change_condition.iloc[-2]}")
+            logger.info(f"收盤價接近布林上軌: {price_near_upper.iloc[-2]}, RSI超買反轉: {rsi_condition.iloc[-2]}")
             logger.info(f"逆勢策略做空信號: {entry_signal.iloc[-2]}")
             
             return entry_signal
