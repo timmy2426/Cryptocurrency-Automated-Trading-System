@@ -145,6 +145,22 @@ class PositionManager:
             self.last_reset_time = midnight_timestamp
             logger.info("重置單日累計數據")
 
+    def _convert_to_candle_timestamp(self, timestamp: int) -> int:
+        """
+        將時間戳轉換為K棒時間戳
+        
+        Args:
+            timestamp: 毫秒時間戳
+            
+        Returns:
+            int: K棒開始時間的毫秒時間戳
+        """
+        # 將時間戳轉換為秒
+        seconds = timestamp // 1000
+        # 計算最近的15分鐘K棒開始時間
+        candle_start = (seconds // (15 * 60)) * (15 * 60)
+        return candle_start * 1000  # 轉換回毫秒
+
     def _match_precision(self, value: Decimal, reference: Decimal) -> Decimal:
         """
         將 value 的小數精度調整為 reference 的精度
@@ -564,15 +580,30 @@ class PositionManager:
             symbol: 交易對
             
         Returns:
-            bool: 是否小於最大持倉時間
+            bool: 是否小於最大持倉K棒數
         """
         try:
             if symbol not in self.positions:
                 return False
                 
+            # 獲取當前時間戳
             current_time = int(time.time() * 1000)
-            holding_time = current_time - self.positions[symbol]['open_time']
-            return holding_time <= self.config['max_holding_bars'] * 15 * 60 * 1000  # 轉換為毫秒
+            
+            # 獲取開倉時間戳
+            open_time = self.positions[symbol]['open_time']
+            
+            # 轉換開倉時間和當前時間為K棒時間戳
+            open_candle_time = self._convert_to_candle_timestamp(open_time)
+            current_candle_time = self._convert_to_candle_timestamp(current_time)
+            
+            # 計算K棒數量
+            candle_count = (current_candle_time - open_candle_time) // (15 * 60 * 1000)
+            
+            # 檢查是否小於最大持倉K棒數
+            holding_bars_not_over = candle_count < self.config['max_holding_bars']
+            logger.info(f"倉位存續期: {candle_count} 根 K 棒, 是否需平倉: {not holding_bars_not_over}")
+
+            return holding_bars_not_over
         
         except Exception as e:
             logger.error(f"檢查倉位存續期失敗: {str(e)}")

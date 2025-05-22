@@ -22,8 +22,8 @@ index:
   bb_change_rate_window: 3
   bb_price_threshold: 0.002
   rsi_length: 14
-  rsi_overbought: 65
-  rsi_oversold: 35
+  rsi_overbought: 70
+  rsi_oversold: 30
   rsi_momentum_offset: 10
   rsi_reversal_offset: 5
   rsi_average_window: 3
@@ -33,7 +33,7 @@ index:
   ma_slope_sideway_threshold: 0.001
   atr_period: 14
   average_volume_window: 6
-  average_volume_scale: 0.8
+  average_volume_scale: 1.2
 
 trading:
   symbol_list:
@@ -47,7 +47,7 @@ trading:
     - ADAUSDT
   leverage: 5
   price_protect: true
-  activate_price_rate: 0.013
+  activate_price_rate: 0.015
   trailing_percent: 1 #百分比%
   max_loss_percent: 0.01
   mean_reversion_tp: 0.01
@@ -57,7 +57,7 @@ risk_control:
   risk_per_trade: 0.005
   max_margin_usage: 0.7
   slippage_percent: 0.5 #百分比%
-  max_holding_bars: 12
+  max_holding_bars: 16
   max_daily_trades: 30
   max_daily_loss: 0.05
   consecutive_losses: 5

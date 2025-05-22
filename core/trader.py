@@ -142,6 +142,9 @@ class Trader:
                     else:
                         should_close = self.signal_generator.is_mean_rev_short_exit(df_15min, indicators).iloc[-2]
 
+            # 檢查倉位管理條件
+            close_position = self.position_manager.can_close_position(symbol)
+
             # 開倉不完整的自我修正機制
             if (self.position_manager.positions[symbol]['open_time'] == None or
                 self.position_manager.positions[symbol]['strategy'] == None or
@@ -152,7 +155,7 @@ class Trader:
             logger.info('-' * 100)
 
             # 如果出場信號為真或倉位管理器建議平倉，則執行平倉
-            if should_close or self.position_manager.can_close_position(symbol):
+            if should_close or close_position:
                 # 執行市價平倉
                 order_result = self.order_executor.close_position(symbol)
                 

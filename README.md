@@ -20,25 +20,49 @@
 
 - **順勢多單**
 
-  - 收盤價突破布林上軌
-  - RSI 高於上漲動能閾值，尚未超買且呈持續上升趨勢
-  - 布林帶寬擴張，且變化率超過閾值
+  - 進場條件
+
+    - 收盤價突破布林上軌
+    - RSI 高於上漲動能閾值，尚未超買且呈持續上升趨勢
+    - 布林帶寬擴張，且變化率超過閾值
+
+  - 出場條件
+    - RSI 超買反轉
+    - 收盤價回到布林中軌
 
 - **順勢空單**
 
-  - 收盤價跌破布林下軌
-  - RSI 低於下跌動能閾值，尚未超賣且呈持續下降趨勢
-  - 布林帶寬擴張，且變化率超過閾值
+  - 進場條件
+
+    - 收盤價跌破布林下軌
+    - RSI 低於下跌動能閾值，尚未超賣且呈持續下降趨勢
+    - 布林帶寬擴張，且變化率超過閾值
+
+  - 出場條件
+    - RSI 超賣反轉
+    - 收盤價回到布林中軌
 
 - **逆勢多單**
 
-  - 收盤價接近或觸及布林下軌
-  - RSI 處於超賣區域，且出現反轉跡象
+  - 進場條件
+
+    - 收盤價接近或觸及布林下軌
+    - RSI 處於超賣區域，且出現反轉跡象
+
+  - 出場條件
+    - RSI 升至 50 之上
+    - 收盤價接近布林中軌
 
 - **逆勢空單**
 
-  - 收盤價接近或觸及布林上軌
-  - RSI 處於超買區域，且出現反轉跡象
+  - 進場條件
+
+    - 收盤價接近或觸及布林上軌
+    - RSI 處於超買區域，且出現反轉跡象
+
+  - 出場條件
+    - RSI 降至 50 之下
+    - 收盤價接近布林中軌
 
 ### 風險管理
 
@@ -157,6 +181,81 @@
 2. 配置環境變數和設定檔
 3. 設定交易參數
 4. 啟動交易系統
+
+## 參數說明
+
+### 控制參數 (Control)
+
+| 參數    | 說明             |
+| ------- | ---------------- |
+| testnet | 是否使用測試網   |
+| debug   | 是否開啟調試模式 |
+
+### 幣安 API 參數 (Binance API)
+
+| 參數                                | 說明                         |
+| ----------------------------------- | ---------------------------- |
+| base_endpoint                       | 主網 REST API 端點           |
+| testnet_rest_api_url                | 測試網 REST API 端點         |
+| webSocket_base_endpoint             | 主網 WebSocket 端點          |
+| webSocket_base_endpoint_for_testnet | 測試網 WebSocket 端點        |
+| max_weight_per_minute               | 每分鐘最大權重限制           |
+| max_order_per_second                | 每秒最大訂單數               |
+| ping_interval                       | WebSocket 心跳間隔（秒）     |
+| pong_timeout                        | WebSocket 心跳超時時間（秒） |
+| reconnect_attempts                  | 重連嘗試次數                 |
+| max_order_per_minute                | 每分鐘最大訂單數             |
+| recv_window                         | 接收窗口時間（毫秒）         |
+
+### 指標參數 (Index)
+
+| 參數                       | 說明               |
+| -------------------------- | ------------------ |
+| bb_length                  | 布林帶週期         |
+| bb_mult                    | 布林帶倍數         |
+| bb_change_rate             | 布林帶變化率閾值   |
+| bb_change_rate_window      | 布林帶變化率窗口   |
+| bb_price_threshold         | 布林帶價格閾值     |
+| rsi_length                 | RSI 週期           |
+| rsi_overbought             | RSI 超買閾值       |
+| rsi_oversold               | RSI 超賣閾值       |
+| rsi_momentum_offset        | RSI 動量偏移       |
+| rsi_reversal_offset        | RSI 反轉偏移       |
+| rsi_average_window         | RSI 平均窗口       |
+| ma_slow_length             | 慢速均線週期       |
+| ma_slope_window            | 均線斜率窗口       |
+| ma_slope_trend_threshold   | 均線斜率趨勢閾值   |
+| ma_slope_sideway_threshold | 均線斜率盤整閾值   |
+| atr_period                 | ATR 週期           |
+| average_volume_window      | 平均成交量窗口     |
+| average_volume_scale       | 平均成交量縮放比例 |
+
+### 交易參數 (Trading)
+
+| 參數                | 說明                 |
+| ------------------- | -------------------- |
+| symbol_list         | 交易對列表           |
+| leverage            | 槓桿倍數             |
+| price_protect       | 是否啟用價格保護     |
+| activate_price_rate | 追蹤止損觸發價格比例 |
+| trailing_percent    | 追蹤止損百分比（%）  |
+| max_loss_percent    | 最大止損百分比       |
+| mean_reversion_tp   | 均值回歸止盈比例     |
+| mean_reversion_sl   | 均值回歸止損比例     |
+
+### 風險控制參數 (Risk Control)
+
+| 參數                    | 說明                |
+| ----------------------- | ------------------- |
+| risk_per_trade          | 每筆交易風險比例    |
+| max_margin_usage        | 最大保證金使用率    |
+| slippage_percent        | 最大滑點百分比（%） |
+| max_holding_bars        | 最大持倉 K 棒數     |
+| max_daily_trades        | 每日最大交易次數    |
+| max_daily_loss          | 每日最大虧損比例    |
+| consecutive_losses      | 連續虧損次數限制    |
+| cooldown_period         | 冷卻期時間（秒）    |
+| min_bandwidth_threshold | 最小布林帶寬閾值    |
 
 ## 注意事項
 
