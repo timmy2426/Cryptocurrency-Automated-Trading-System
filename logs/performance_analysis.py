@@ -10,6 +10,7 @@ from openpyxl.utils import get_column_letter
 BASE_DIR = os.path.dirname(__file__)
 DATA_FOLDER = os.path.join(BASE_DIR, "trade_log")
 RISK_FREE_RATE = 0.025
+LEVERAGE = 5
 
 # 策略名稱對照表
 STRATEGY_NAME_MAP = {
@@ -41,83 +42,88 @@ def compute_metrics(df):
     # 確保數據類型正確
     df['pnl_percentage'] = pd.to_numeric(df['pnl_percentage'], errors='coerce')
     df['pnl'] = pd.to_numeric(df['pnl'], errors='coerce')
+    df['open_price'] = pd.to_numeric(df['open_price'], errors='coerce')
+    df['open_amt'] = pd.to_numeric(df['open_amt'], errors='coerce')
     
     # 使用文件日期作為主要日期
     df['date'] = pd.to_datetime(df['file_date']).dt.date
     
-    # 打印調試信息
-    print(f"總交易筆數: {len(df)}")
-    print(f"日期範圍: {df['date'].min()} 到 {df['date'].max()}")
-    print(f"每日交易筆數:\n{df.groupby('date').size()}")
-
+    # 計算每筆交易的實際投入資金（考慮槓桿）
+    df['investment'] = (df['open_amt'] * df['open_price']) / LEVERAGE
+    
+    # 計算每日總投入資金和總盈虧
     daily_summary = df.groupby('date').agg(
         每日交易次數=('symbol', 'count'),
         每日盈虧=('pnl', 'sum'),
-        每日報酬率=('pnl_percentage', 'sum')
+        總投入資金=('investment', 'sum')
     ).reset_index()
-
-    # 重命名欄位，將底線改為括號
+    
+    # 計算每日報酬率
+    daily_summary['每日報酬率'] = (daily_summary['每日盈虧'] / daily_summary['總投入資金']) * 100
+    daily_summary['每日報酬率'] = round(daily_summary['每日報酬率'], 2)
+    
+    # 重命名欄位
     daily_summary = daily_summary.rename(columns={
         'date': '日期',
         '每日交易次數': '每日交易次數 (筆)',
         '每日盈虧': '每日盈虧 (USDT)',
         '每日報酬率': '每日報酬率 (%)'
     })
-
-    # 計算每日報酬率
-    daily_returns_float = daily_summary['每日報酬率 (%)'].tolist()
-    daily_returns_float = [x / 100 for x in daily_returns_float]
     
-    # 打印調試信息
-    print(f"每日報酬率: {daily_returns_float}")
+    # 計算總報酬率
+    total_investment = daily_summary['總投入資金'].sum()
+    total_pnl = daily_summary['每日盈虧 (USDT)'].sum()
+    total_return = total_pnl / total_investment
     
-    avg_daily_return = sum(daily_returns_float) / len(daily_returns_float) if daily_returns_float else 0
-    std_daily_return = std(daily_returns_float)
+    # 計算交易天數
+    trading_days = (daily_summary['日期'].max() - daily_summary['日期'].min()).days + 1
     
-    # 如果只有一天的數據，使用一個較小的標準差值來避免除以零
-    if std_daily_return == 0 and len(daily_returns_float) == 1:
-        std_daily_return = 0.0001
+    # 計算年化報酬率
+    annualized_return = (1 + total_return) ** (365 / trading_days) - 1
     
-    # 打印調試信息
-    print(f"平均日報酬率: {avg_daily_return}")
-    print(f"日報酬率標準差: {std_daily_return}")
+    # 計算日報酬率的標準差
+    daily_returns = daily_summary['每日報酬率 (%)'].values / 100
+    std_daily_return = std(daily_returns)
     
-    # 修改為365天
-    annualized_return = ((1 + avg_daily_return) ** 365) - 1 if avg_daily_return else 0
-    annualized_volatility = std_daily_return * math.sqrt(365)
+    # 計算年化波動率
+    annualized_volatility = std_daily_return * math.sqrt(365 / trading_days)
+    
+    # 計算夏普比率
+    # 根據交易天數調整無風險利率
+    daily_risk_free_rate = (1 + RISK_FREE_RATE) ** (1/365) - 1
     sharpe_ratio = (annualized_return - RISK_FREE_RATE) / annualized_volatility if annualized_volatility != 0 else 0
-
-    # 打印調試信息
-    print(f"年化報酬率: {annualized_return}")
-    print(f"年化波動率: {annualized_volatility}")
-    print(f"夏普比率: {sharpe_ratio}")
-
+    
+    # 計算最大回撤（使用臨時變數）
+    temp_cumulative = total_investment + daily_summary['每日盈虧 (USDT)'].cumsum()
+    temp_peak = temp_cumulative.cummax()
+    temp_drawdown = (temp_peak - temp_cumulative) / temp_peak
+    max_drawdown = temp_drawdown.max()
+    
+    # 計算勝率和其他指標
     wins = df[df['pnl'] > 0]
     losses = df[df['pnl'] < 0]
     win_rate = len(wins) / len(df) if len(df) > 0 else 0
     avg_win = wins['pnl'].mean() if not wins.empty else 0
     avg_loss = abs(losses['pnl'].mean()) if not losses.empty else 0
-
-    # 計算盈虧比 (Profit/Loss Ratio)
+    
+    # 計算盈虧比
     profit_loss_ratio = avg_win / avg_loss if avg_loss != 0 else 0
-
-    # 計算期望報酬 (Expected Return)
-    # 期望報酬 = (勝率 * 平均獲利) - ((1-勝率) * 平均虧損)
+    
+    # 計算期望報酬
     expected_return = (win_rate * avg_win) - ((1 - win_rate) * avg_loss)
-
-    df['cum_pnl'] = df['pnl'].cumsum()
-    cum_max = df['cum_pnl'].cummax()
-    drawdown = df['cum_pnl'] - cum_max
-    max_drawdown = drawdown.min()
-
+    
+    # 計算最大連續虧損次數
     df['is_loss'] = df['pnl'] < 0
     df['loss_streak'] = df['is_loss'].groupby((~df['is_loss']).cumsum()).cumsum()
     max_loss_streak = df['loss_streak'].max() if 'loss_streak' in df else 0
-
+    
+    # 計算平均持倉時間
     df['duration_minutes'] = (df['close_time'] - df['open_time']) / 1000 / 60
     avg_holding = df['duration_minutes'].mean()
-    total_days = (daily_summary['日期'].max() - daily_summary['日期'].min()).days + 1
-
+    
+    # 移除不需要的欄位
+    daily_summary = daily_summary.drop(columns=['總投入資金'])
+    
     summary = {
         '總交易次數 (筆)': len(df),
         '平均每日交易次數 (筆)': round(df.groupby('date').size().mean(), 2),
@@ -129,12 +135,12 @@ def compute_metrics(df):
         '平均虧損 (USDT)': round(avg_loss, 2),
         '盈虧比': round(profit_loss_ratio, 2),
         '期望報酬 (USDT)': round(expected_return, 2),
-        '最大回撤 (USDT)': round(max_drawdown, 2),
+        '最大回撤 (%)': round(max_drawdown * 100, 2),
         '最大連續虧損次數 (筆)': max_loss_streak,
         '平均持倉時間 (分鐘)': round(avg_holding, 2),
-        '交易期間 (天)': total_days
+        '交易期間 (天)': trading_days
     }
-
+    
     return daily_summary, summary
 
 def compute_strategy_breakdown(df):
@@ -152,19 +158,30 @@ def compute_strategy_breakdown(df):
         wins = group[group['pnl'] > 0]
         losses = group[group['pnl'] < 0]
 
-        daily = group.groupby('date')['pnl_percentage'].sum().tolist()
-        daily_returns_float = [x / 100 for x in daily]
-        avg_daily = sum(daily_returns_float) / len(daily_returns_float) if daily_returns_float else 0
-        std_daily = std(daily_returns_float)
+        # 計算每日總投入資金和總盈虧（使用暫時變數）
+        daily_pnl = group.groupby('date')['pnl'].sum()
+        daily_investment = group.groupby('date').apply(lambda x: sum(x['open_amt'] * x['open_price']) / LEVERAGE)
         
-        # 如果只有一天的數據，使用一個較小的標準差值
-        if std_daily == 0 and len(daily_returns_float) == 1:
-            std_daily = 0.0001
-
-        # 修改為365天
-        annualized_return = ((1 + avg_daily) ** 365) - 1 if avg_daily else 0
-        annualized_volatility = std_daily * math.sqrt(365)
-        sharpe_ratio = (annualized_return - RISK_FREE_RATE) / annualized_volatility if annualized_volatility else 0
+        # 計算總報酬率
+        total_investment = daily_investment.sum()
+        total_pnl = daily_pnl.sum()
+        total_return = total_pnl / total_investment
+        
+        # 計算交易天數
+        trading_days = (group['date'].max() - group['date'].min()).days + 1
+        
+        # 計算年化報酬率
+        annualized_return = (1 + total_return) ** (365 / trading_days) - 1
+        
+        # 計算日報酬率的標準差
+        daily_returns = (daily_pnl / daily_investment).values
+        std_daily_return = std(daily_returns)
+        
+        # 計算年化波動率
+        annualized_volatility = std_daily_return * math.sqrt(365 / trading_days)
+        
+        # 計算夏普比率
+        sharpe_ratio = (annualized_return - RISK_FREE_RATE) / annualized_volatility if annualized_volatility != 0 else 0
 
         group['cum_pnl'] = group['pnl'].cumsum()
         max_drawdown = (group['cum_pnl'] - group['cum_pnl'].cummax()).min()
