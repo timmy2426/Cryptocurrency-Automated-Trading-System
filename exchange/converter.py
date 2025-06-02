@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 from decimal import Decimal
 import logging
 from .data_models import Order, OrderResult, PositionInfo, AccountInfo
@@ -204,11 +204,11 @@ class BinanceConverter:
             raise
 
     @staticmethod
-    def get_close_reason(order: Order) -> Optional[str]:
+    def get_close_reason(order: Union[Order, OrderResult]) -> Optional[str]:
         """從訂單數據中獲取平倉原因
         
         Args:
-            order: Order 物件，包含訂單信息
+            order: Order 或 OrderResult 物件，包含訂單信息
             
         Returns:
             str: 平倉原因，如果沒有則返回 None
@@ -222,13 +222,12 @@ class BinanceConverter:
                     return CloseReason.STOP_LOSS.value
                 elif order.orig_type == OrderType.TRAILING_STOP_MARKET:
                     return CloseReason.TRAILING_STOP.value
-            
-            # 根據執行類型判斷
-            if order.execution_type:
-                if order.execution_type == 'LIQUIDATION':
+                elif order.orig_type == OrderType.TAKE_PROFIT:
+                    return CloseReason.TAKE_PROFIT.value
+                elif order.orig_type == OrderType.STOP:
+                    return CloseReason.STOP_LOSS.value
+                elif order.orig_type == OrderType.LIQUIDATION:
                     return CloseReason.LIQUIDATION.value
-                elif order.execution_type == 'EXPIRED':
-                    return CloseReason.MANUAL.value
             
             # 如果都無法判斷，則返回手動平倉
             return CloseReason.MANUAL.value

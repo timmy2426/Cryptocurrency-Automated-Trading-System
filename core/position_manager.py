@@ -273,7 +273,7 @@ class PositionManager:
             #更新倉位信息
             position = self.positions.get(symbol)
             if position:
-                # 更新訂單結果
+                # 更新訂單事件
                 if isinstance(position_data, Order) and position_data.status in [OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED]:
                     if position_data.reduce_only  or position_data.close_position: # 平倉單成交
                         position['side'] = position_data.side.value
@@ -306,6 +306,40 @@ class PositionManager:
                             position['open_price'] = self._match_precision(total_cost / position['open_amt'], position_data.avg_price)
                         position['open_size'] = self._match_precision(position['open_amt'] * position['open_price'], position_data.last_filled_qty)
                         position['open_size'] *= Decimal('-1') if position['side'] == 'SELL' else Decimal('1')
+                # 更新訂單結果
+                if isinstance(position_data, OrderResult) and position_data.status == OrderStatus.FILLED:
+                    if position_data.reduce_only  or position_data.close_position: # 平倉單成交
+                        position['side'] = position_data.side.value
+                        if position['close_time'] == None:
+                            position['close_time'] = position_data.update_time
+                        if position['close_reason'] == None:
+                            position['close_reason'] = BinanceConverter.get_close_reason(position_data)
+                        if position['close_price'] == Decimal('0') or position['close_amt'] < position_data.executed_qty:
+                            position['close_price'] = position_data.avg_price
+                        if position['close_amt'] == Decimal('0') or position['close_amt'] < position_data.executed_qty:
+                            position['close_amt'] = position_data.executed_qty
+                        if position['close_size'] == Decimal('0') or position['close_size'] < position_data.cum_quote:
+                            position['close_size'] = position_data.cum_quote
+                            position['close_size'] *= Decimal('-1') if position['side'] == 'SELL' else Decimal('1')
+                        if position['side'] == 'SELL':
+                            position['pnl'] = (position['close_price'] - position['open_price']) * position['close_amt']
+                        else:
+                            position['pnl'] = (position['open_price'] - position['close_price']) * position['close_amt']
+                        if position['close_size'] != Decimal('0') and position['pnl'] != Decimal('0'):
+                            position['pnl_percentage'] = (
+                                (position['pnl'] / abs(position['close_size'])) * Decimal('100')
+                                ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    else: # 開倉單成交
+                        position['side'] = position_data.side.value
+                        if position['open_time'] == None:
+                            position['open_time'] = position_data.update_time
+                        if position['open_price'] == Decimal('0') or position['open_amt'] < position_data.executed_qty:
+                            position['open_price'] = position_data.avg_price
+                        if position['open_amt'] == Decimal('0') or position['open_amt'] < position_data.executed_qty:
+                            position['open_amt'] = position_data.executed_qty
+                        if position['open_size'] == Decimal('0') or position['open_size'] < position_data.cum_quote:
+                            position['open_size'] = position_data.cum_quote
+                            position['open_size'] *= Decimal('-1') if position['side'] == 'SELL' else Decimal('1')
 
                 # 更新開倉信息
                 if update_config and 'strategy' in update_config:

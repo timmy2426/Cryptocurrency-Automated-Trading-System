@@ -168,6 +168,7 @@ class Trader:
                     order_status = self.order_executor.get_order_status(symbol, order_result.order_id)
                     
                     if order_status.status == OrderStatus.FILLED:
+                        self.position_manager.update_position_info(order_status)
                         logger.info(f"{symbol} 訂單已完全成交")
                         break
                     elif order_status.status in [OrderStatus.CANCELED, OrderStatus.EXPIRED]:
@@ -255,6 +256,7 @@ class Trader:
                 order_status = self.order_executor.get_order_status(symbol, order_result.order_id)
                 
                 if order_status.status == OrderStatus.FILLED:
+                    self.position_manager.update_position_info(order_status)
                     logger.info(f"{symbol} 訂單已完全成交")
                     break
                 elif order_status.status in [OrderStatus.CANCELED, OrderStatus.EXPIRED]:
