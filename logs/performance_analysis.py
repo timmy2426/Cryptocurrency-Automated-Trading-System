@@ -11,6 +11,7 @@ BASE_DIR = os.path.dirname(__file__)
 DATA_FOLDER = os.path.join(BASE_DIR, "trade_log")
 RISK_FREE_RATE = 0.025
 LEVERAGE = 5
+COMMISSION = 0.0005
 
 # 策略名稱對照表
 STRATEGY_NAME_MAP = {
@@ -44,6 +45,9 @@ def compute_metrics(df):
     df['pnl'] = pd.to_numeric(df['pnl'], errors='coerce')
     df['open_price'] = pd.to_numeric(df['open_price'], errors='coerce')
     df['open_amt'] = pd.to_numeric(df['open_amt'], errors='coerce')
+    
+    # 計算每筆交易的手續費並調整實際盈虧
+    df['pnl'] = df['pnl'] - (df['open_amt'] * df['open_price'] * COMMISSION * 2)
     
     # 使用文件日期作為主要日期
     df['date'] = pd.to_datetime(df['file_date']).dt.date
@@ -155,6 +159,10 @@ def compute_strategy_breakdown(df):
 
         group['date'] = pd.to_datetime(group['file_date']).dt.date
         group['duration_minutes'] = (group['close_time'] - group['open_time']) / 1000 / 60
+        
+        # 調整實際盈虧（扣除手續費）
+        group['pnl'] = group['pnl'] - (group['open_amt'] * group['open_price'] * COMMISSION * 2)
+        
         wins = group[group['pnl'] > 0]
         losses = group[group['pnl'] < 0]
 
