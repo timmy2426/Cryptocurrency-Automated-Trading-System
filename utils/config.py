@@ -93,7 +93,7 @@ def check_config_parameters(required_params: List[str]) -> Dict[str, Any]:
             # 檢查指標配置參數
             elif param in ['bb_length', 'bb_mult', 'bb_change_rate', 'bb_change_rate_window', 'bb_price_threshold', 'rsi_length', 
                            'rsi_overbought', 'rsi_oversold', 'rsi_momentum_offset', 'rsi_reversal_offset', 'rsi_average_window', 
-                           'ma_slow_length', 'ma_slope_window', 'ma_slope_trend_threshold', 'ma_slope_sideway_threshold', 
+                           'ma_slow_length', 'ma_slope_window', 'ma_slope_threshold', 
                            'atr_period', 'average_volume_window', 'average_volume_scale']:
                 result[param] = config.get('index', {}).get(param)
                 

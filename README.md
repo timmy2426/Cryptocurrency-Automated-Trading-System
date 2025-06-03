@@ -209,26 +209,25 @@
 
 ### 指標參數 (Index)
 
-| 參數                       | 說明               |
-| -------------------------- | ------------------ |
-| bb_length                  | 布林帶週期         |
-| bb_mult                    | 布林帶倍數         |
-| bb_change_rate             | 布林帶變化率閾值   |
-| bb_change_rate_window      | 布林帶變化率窗口   |
-| bb_price_threshold         | 布林帶價格閾值     |
-| rsi_length                 | RSI 週期           |
-| rsi_overbought             | RSI 超買閾值       |
-| rsi_oversold               | RSI 超賣閾值       |
-| rsi_momentum_offset        | RSI 動量偏移       |
-| rsi_reversal_offset        | RSI 反轉偏移       |
-| rsi_average_window         | RSI 平均窗口       |
-| ma_slow_length             | 慢速均線週期       |
-| ma_slope_window            | 均線斜率窗口       |
-| ma_slope_trend_threshold   | 均線斜率趨勢閾值   |
-| ma_slope_sideway_threshold | 均線斜率盤整閾值   |
-| atr_period                 | ATR 週期           |
-| average_volume_window      | 平均成交量窗口     |
-| average_volume_scale       | 平均成交量縮放比例 |
+| 參數                  | 說明               |
+| --------------------- | ------------------ |
+| bb_length             | 布林帶週期         |
+| bb_mult               | 布林帶倍數         |
+| bb_change_rate        | 布林帶變化率閾值   |
+| bb_change_rate_window | 布林帶變化率窗口   |
+| bb_price_threshold    | 布林帶價格閾值     |
+| rsi_length            | RSI 週期           |
+| rsi_overbought        | RSI 超買閾值       |
+| rsi_oversold          | RSI 超賣閾值       |
+| rsi_momentum_offset   | RSI 動量偏移       |
+| rsi_reversal_offset   | RSI 反轉偏移       |
+| rsi_average_window    | RSI 平均窗口       |
+| ma_slow_length        | 慢速均線週期       |
+| ma_slope_window       | 均線斜率窗口       |
+| ma_slope_threshold    | 均線斜率閾值       |
+| atr_period            | ATR 週期           |
+| average_volume_window | 平均成交量窗口     |
+| average_volume_scale  | 平均成交量縮放比例 |
 
 ### 交易參數 (Trading)
 

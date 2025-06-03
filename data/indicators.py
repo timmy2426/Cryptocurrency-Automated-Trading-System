@@ -168,18 +168,27 @@ class TechnicalIndicators:
             raise
 
     def calculate_ma_slope(self, ma: pd.Series) -> pd.Series:
-        """計算移動平均線斜率
+        """計算移動平均線斜率(標準化)
         
         Args:
             ma: 移動平均線
             
         Returns:
-            pd.Series: 移動平均線斜率
+            pd.Series: 標準化移動平均線斜率
         """
         try:
-            # 計算斜率
-            slope = ma.pct_change(periods=self.config['ma_slope_window'])
-            return slope
+            window = self.config['ma_slope_window']
+            
+            # 原始斜率
+            raw_slope = ma.pct_change(periods=window)
+
+            # 標準差
+            rolling_std = ma.pct_change().rolling(window=window).std()
+
+            # 標準化斜率
+            normalized_slope = raw_slope / (rolling_std + 1e-9)
+
+            return normalized_slope
     
         except Exception as e:
             logger.error(f"計算移動平均線斜率失敗: {str(e)}")

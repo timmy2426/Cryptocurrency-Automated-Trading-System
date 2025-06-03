@@ -18,7 +18,7 @@ binance_api:
 index:
   bb_length: 20
   bb_mult: 1.5
-  bb_change_rate: 0.2
+  bb_change_rate: 0.3
   bb_change_rate_window: 3
   bb_price_threshold: 0.002
   rsi_length: 14
@@ -29,8 +29,7 @@ index:
   rsi_average_window: 3
   ma_slow_length: 50
   ma_slope_window: 6
-  ma_slope_trend_threshold: 0.01
-  ma_slope_sideway_threshold: 0.001
+  ma_slope_threshold: 20
   atr_period: 14
   average_volume_window: 6
   average_volume_scale: 1.2
@@ -47,7 +46,7 @@ trading:
     - ADAUSDT
   leverage: 5
   price_protect: true
-  activate_price_rate: 0.015
+  activate_price_rate: 0.012
   trailing_percent: 1 #百分比%
   max_loss_percent: 0.01
   mean_reversion_tp: 0.01
