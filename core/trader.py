@@ -97,13 +97,13 @@ class Trader:
             logger.error(f"交易執行失敗: {str(e)}")
             raise
             
-    def _get_klines(self, symbol: str, interval: str = '15m') -> pd.DataFrame:
+    def _get_klines(self, symbol: str, interval: str = '1h') -> pd.DataFrame:
         """
         獲取K線數據
         
         Args:
             symbol: 交易對
-            interval: 時間週期，默認為15分鐘
+            interval: 時間週期，默認為1小時
             
         Returns:
             pd.DataFrame: K線數據
@@ -121,29 +121,30 @@ class Trader:
             position = self.position_manager.positions[symbol]
             logger.info(f"倉位 {symbol} 資訊: {position}")
             # 獲取K線數據
-            df_15min = self._get_klines(symbol)
-            indicators = self.signal_generator.calculate_indicators(df_15min)
+            df_1h = self._get_klines(symbol)
+            indicators = self.signal_generator.calculate_indicators(df_1h)
 
             # 根據開倉策略檢查出場信號
             logger.info('-' * 100)
             logger.info(f"檢查 {symbol} 平倉信號")
-            logger.info(f"收盤價格: {df_15min['close'].iloc[-2]}")
+            logger.info(f"收盤價格: {df_1h['close'].iloc[-2]}")
 
             should_close = False
+            is_trend = position['strategy'].startswith("trend")
             if position['strategy'] != None:
-                if position['strategy'].startswith("trend"):
+                if is_trend:
                     if position['side'] == "BUY":
-                        should_close = self.signal_generator.is_trend_long_exit(df_15min, indicators).iloc[-2]
+                        should_close = self.signal_generator.is_trend_long_exit(df_1h, indicators).iloc[-2]
                     else:
-                        should_close = self.signal_generator.is_trend_short_exit(df_15min, indicators).iloc[-2]
+                        should_close = self.signal_generator.is_trend_short_exit(df_1h, indicators).iloc[-2]
                 else:  # mean_reversion
                     if position['side'] == "BUY":
-                        should_close = self.signal_generator.is_mean_rev_long_exit(df_15min, indicators).iloc[-2]
+                        should_close = self.signal_generator.is_mean_rev_long_exit(df_1h, indicators).iloc[-2]
                     else:
-                        should_close = self.signal_generator.is_mean_rev_short_exit(df_15min, indicators).iloc[-2]
+                        should_close = self.signal_generator.is_mean_rev_short_exit(df_1h, indicators).iloc[-2]
 
             # 檢查倉位管理條件
-            close_position = self.position_manager.can_close_position(symbol)
+            close_position = self.position_manager.can_close_position(symbol, is_trend)
 
             # 開倉不完整的自我修正機制
             if (self.position_manager.positions[symbol]['open_time'] == None or
@@ -195,16 +196,16 @@ class Trader:
         """處理開倉邏輯"""
         try:
             # 獲取多個時間框架的K線數據
-            df_15min = self._get_klines(symbol, '15m')
             df_1h = self._get_klines(symbol, '1h')
             df_4h = self._get_klines(symbol, '4h')
+            df_1d = self._get_klines(symbol, '1d')
             
             # 檢查開倉信號
             logger.info('-' * 100)
             logger.info(f"檢查 {symbol} 開倉信號")
-            logger.info(f"收盤價格: {df_15min['close'].iloc[-2]}， 成交量: {df_15min['volume'].iloc[-2]}")
+            logger.info(f"收盤價格: {df_1h['close'].iloc[-2]}， 成交量: {df_1h['volume'].iloc[-2]}")
 
-            selected_strategy = self.strategy.select(symbol, df_15min, df_1h, df_4h)
+            selected_strategy = self.strategy.select(symbol, df_1h, df_4h, df_1d)
 
             logger.info(f"倉位 {symbol} 開倉信號: {selected_strategy}")
             logger.info('-' * 100)
@@ -213,23 +214,20 @@ class Trader:
                 return
                 
             # 執行開倉
-            self._open_position(symbol, selected_strategy)
+            self._open_position(symbol, selected_strategy, df_1h, df_4h, df_1d)
             
         except Exception as e:
             logger.error(f"處理開倉 {symbol} 失敗: {str(e)}")
             
-    def _open_position(self, symbol: str, selected_strategy: str) -> None:
+    def _open_position(self, symbol: str, selected_strategy: str, df_1h: pd.DataFrame, df_4h: pd.DataFrame, df_1d: pd.DataFrame) -> None:
         """執行開倉操作"""
         try:
-            # 獲取15分鐘K線數據
-            df_15min = self._get_klines(symbol)
-            
             # 計算倉位大小
             is_trend = selected_strategy.startswith("trend")
             position_size = self.position_manager.calculate_position_size(
                 symbol=symbol,
                 is_trend=is_trend,
-                df=df_15min
+                df=df_1h
             )
             
             # 創建市價開倉訂單
@@ -273,6 +271,9 @@ class Trader:
             else:
                 logger.error(f"{symbol} 倉位在 {max_retries} 秒內未成交")
                 return
+
+            # 記錄市場條件
+            self.position_manager.record_market_condition(symbol, df_1h, df_4h, df_1d)
 
             # 獲取開倉價格
             open_price = self.position_manager.positions[symbol]['open_price']

@@ -7,6 +7,7 @@ import time
 import pandas as pd
 
 from .event_logger import EventLogger
+from .risk_control import RiskControl
 from exchange import (
     OrderExecutor,
     PositionInfo,
@@ -45,6 +46,7 @@ class PositionManager:
         self.message_formatter = message_formatter
         self.send_message = send_message
         self.event_logger = EventLogger()
+        self.risk_control = RiskControl()
         self.lock = Lock()
         self.consecutive_losses = 0  # 連續虧損次數
         self.cooldown_start_time = 0  # 冷卻期開始時間
@@ -82,6 +84,8 @@ class PositionManager:
             'price_rate': None,
             'pnl': Decimal('0'),
             'pnl_percentage': Decimal('0'),
+            'account_equity': Decimal('0'),
+            'market_condition': None,
             'is_open_message_sent': False,
             'is_close_message_sent': False
         }
@@ -108,7 +112,8 @@ class PositionManager:
                 'max_daily_trades',
                 'consecutive_losses',
                 'cooldown_period',
-                'max_holding_bars',
+                'max_trend_holding_bars',
+                'max_mean_rev_holding_bars',
                 'risk_per_trade',
                 'max_loss_percent',
                 'mean_reversion_sl',
@@ -157,8 +162,8 @@ class PositionManager:
         """
         # 將時間戳轉換為秒
         seconds = timestamp // 1000
-        # 計算最近的15分鐘K棒開始時間
-        candle_start = (seconds // (15 * 60)) * (15 * 60)
+        # 計算最近的60分鐘K棒開始時間
+        candle_start = (seconds // (60 * 60)) * (60 * 60)
         return candle_start * 1000  # 轉換回毫秒
 
     def _match_precision(self, value: Decimal, reference: Decimal) -> Decimal:
@@ -171,6 +176,16 @@ class PositionManager:
             return value.quantize(precision, rounding=ROUND_HALF_UP)
         else:
             return value.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+
+    def record_market_condition(self, symbol: str, df_1h: pd.DataFrame, df_4h: pd.DataFrame, df_1d: pd.DataFrame) -> None:
+        """
+        記錄市場條件
+        """
+        if symbol not in self.positions:
+            logger.warning(f"倉位 {symbol} 不存在，無法記錄市場條件")
+            return
+        market_condition = self.risk_control.check_trend_filter(df_1h, df_4h, df_1d)
+        self.positions[symbol]['market_condition'] = market_condition
 
     def update_account_info(self, update_config: Optional[Dict[str, Any]] = None) -> None:
         """
@@ -512,6 +527,9 @@ class PositionManager:
                 self.send_message.send_close_position_message(embed)
                 logger.info(f"成功發送交易對 {symbol} 的平倉消息")
 
+                # 紀錄帳戶權益
+                self.positions[symbol]['account_equity'] = self.account_info['account_equity']
+
                 # 設置平倉消息已發送標記
                 self.positions[symbol]['is_close_message_sent'] = True
 
@@ -606,13 +624,14 @@ class PositionManager:
             logger.error(f"檢查冷卻期失敗: {str(e)}")
             return False
             
-    def check_holding_period(self, symbol: str) -> bool:
+    def check_holding_period(self, symbol: str, is_trend: bool) -> bool:
         """
         檢查倉位存續期
         
         Args:
             symbol: 交易對
-            
+            is_trend: 是否為順勢單
+
         Returns:
             bool: 是否小於最大持倉K棒數
         """
@@ -631,10 +650,14 @@ class PositionManager:
             current_candle_time = self._convert_to_candle_timestamp(current_time)
             
             # 計算K棒數量
-            candle_count = (current_candle_time - open_candle_time) // (15 * 60 * 1000)
+            candle_count = (current_candle_time - open_candle_time) // (60 * 60 * 1000)
             
             # 檢查是否小於最大持倉K棒數
-            holding_bars_not_over = candle_count < self.config['max_holding_bars']
+            if is_trend:
+                holding_bars_not_over = candle_count < self.config['max_trend_holding_bars']
+            else:
+                holding_bars_not_over = candle_count < self.config['max_mean_rev_holding_bars']
+                
             logger.info(f"倉位存續期: {candle_count} 根 K 棒, 是否需平倉: {not holding_bars_not_over}")
 
             return holding_bars_not_over
@@ -703,7 +726,7 @@ class PositionManager:
             self.check_cooldown()
         ])
         
-    def can_close_position(self, symbol: str) -> bool:
+    def can_close_position(self, symbol: str, is_trend: bool) -> bool:
         """
         檢查是否可以平倉
         
@@ -713,7 +736,7 @@ class PositionManager:
         Returns:
             bool: 是否可以平倉
         """
-        return not self.check_holding_period(symbol)
+        return not self.check_holding_period(symbol, is_trend)
         
     def check_slippage(self, symbol: str) -> bool:
         """

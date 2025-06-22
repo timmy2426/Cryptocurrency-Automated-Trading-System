@@ -35,13 +35,13 @@ class RiskControl:
             logger.error(f"初始化風險控制類失敗: {str(e)}")
             raise
             
-    def check_trend_filter(self, df_15min: pd.DataFrame, df_1h: pd.DataFrame, df_4h: pd.DataFrame) -> list[str]:
+    def check_trend_filter(self, df_1h: pd.DataFrame, df_4h: pd.DataFrame, df_1d: pd.DataFrame) -> list[str]:
         """多週期趨勢濾網
         
         Args:
-            df_15min: 15分鐘K線數據
             df_1h: 1小時K線數據
             df_4h: 4小時K線數據
+            df_1d: 1天K線數據
             
         Returns:
             str: 趨勢狀態，'long'/'sideway'/'short'
@@ -51,18 +51,19 @@ class RiskControl:
             status = []
             slope_threshold = self.config['ma_slope_threshold']
             
-            for df in [df_15min, df_1h, df_4h]:
+            for df in [df_1h, df_4h, df_1d]:
                 # 計算 ma_fast 和 ma_slow
                 ma_fast = self.indicators.calculate_sma(df, self.config['bb_length'])
                 ma_slow = self.indicators.calculate_sma(df, self.config['ma_slow_length'])
                 
                 # 計算斜率
                 ma_fast_slope = self.indicators.calculate_ma_slope(ma_fast)
+                is_sideway = ma_fast_slope.iloc[-2] < slope_threshold and ma_fast_slope.iloc[-2] > -slope_threshold
 
                 # SMA排列和斜率判斷
-                if ma_fast.iloc[-2] > ma_slow.iloc[-2] and ma_fast_slope.iloc[-2] > slope_threshold:
+                if ma_fast.iloc[-2] > ma_slow.iloc[-2] and ma_fast_slope.iloc[-2] > 0 and not is_sideway:
                     status.append('long')
-                elif ma_fast.iloc[-2] < ma_slow.iloc[-2] and ma_fast_slope.iloc[-2] < -slope_threshold:
+                elif ma_fast.iloc[-2] < ma_slow.iloc[-2] and ma_fast_slope.iloc[-2] < 0 and not is_sideway:
                     status.append('short')
                 else:
                     status.append('sideway')
@@ -116,22 +117,22 @@ class RiskControl:
             logger.error(f"檢查BB帶寬濾網失敗: {str(e)}")
             raise
             
-    def select_strategy(self, df_15min: pd.DataFrame, df_1h: pd.DataFrame, df_4h: pd.DataFrame) -> str:
+    def select_strategy(self, df_1h: pd.DataFrame, df_4h: pd.DataFrame, df_1d: pd.DataFrame) -> str:
         """策略切換器
         
         Args:
-            df_15min: 15分鐘K線數據
             df_1h: 1小時K線數據
             df_4h: 4小時K線數據
+            df_1d: 1天K線數據
             
         Returns:
             str: 選擇的策略，'trend'/'mean_reversion'
         """
         try:
             # 檢查各濾網
-            trend = self.check_trend_filter(df_15min, df_1h, df_4h)
-            volume_ok = self.check_volume_filter(df_15min)
-            bandwidth_ok = self.check_bandwidth_filter(df_15min)
+            trend = self.check_trend_filter(df_1h, df_4h, df_1d)
+            volume_ok = self.check_volume_filter(df_1h)
+            bandwidth_ok = self.check_bandwidth_filter(df_1h)
 
             logger.info(f"風險控制器：趨勢濾網: {trend}, 成交量濾網: {volume_ok}, 布林帶寬濾網: {bandwidth_ok}")
             
@@ -140,28 +141,35 @@ class RiskControl:
             if volume_ok and bandwidth_ok:
                 # 使用元組作為鍵來映射策略
                 strategy_map = {
-                    # 強趨勢 (只做順勢策略)
-                    ('long', 'long', 'long'): ['trend_long'],
-                    ('short', 'short', 'short'): ['trend_short'],
-                    ('sideway', 'long', 'long'): ['trend_long'],
-                    ('sideway', 'short', 'short'): ['trend_short'],
-                    # 弱趨勢 (做順勢和逆勢策略)
-                    ('long', 'sideway', 'long'): ['trend_long', 'mean_rev_long'],
-                    ('short', 'sideway', 'short'): ['trend_short', 'mean_rev_short'],
-                    ('long', 'long', 'sideway'): ['trend_long', 'mean_rev_long'],
-                    ('short', 'short', 'sideway'): ['trend_short', 'mean_rev_short'],
-                    ('long', 'long', 'short'): ['trend_long', 'mean_rev_long'],
-                    ('short', 'short', 'long'): ['trend_short', 'mean_rev_short'],
-                    # 盤整 (只做逆勢策略)
-                    ('short', 'long', 'sideway'): ['mean_rev_long', 'mean_rev_short'],
-                    ('long', 'short', 'sideway'): ['mean_rev_long', 'mean_rev_short'],
-                    ('long', 'sideway', 'sideway'): ['mean_rev_long', 'mean_rev_short'],
-                    ('short', 'sideway', 'sideway'): ['mean_rev_long', 'mean_rev_short'],
-                    ('sideway', 'long', 'sideway'): ['mean_rev_long', 'mean_rev_short'],
-                    ('sideway', 'short', 'sideway'): ['mean_rev_long', 'mean_rev_short'],
-                    ('sideway', 'sideway', 'long'): ['mean_rev_long', 'mean_rev_short'],
-                    ('sideway', 'sideway', 'short'): ['mean_rev_long', 'mean_rev_short'],
-                    ('sideway', 'sideway', 'sideway'): ['mean_rev_long', 'mean_rev_short'],
+                    # 列出完整108種盤勢組合
+                    # 免責聲明：使用者須自行利用回測引擎進行盤勢組合篩選與參數調整，若因直接使用此處的策略組合而導致虧損，作者不負任何責任。
+                    ('long', 'long', 'long'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('long', 'long', 'short'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('long', 'long', 'sideway'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('long', 'short', 'long'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('long', 'short', 'short'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('long', 'short', 'sideway'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('long', 'sideway', 'long'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('long', 'sideway', 'short'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('long', 'sideway', 'sideway'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('short', 'long', 'long'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('short', 'long', 'short'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('short', 'long', 'sideway'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('short', 'short', 'long'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('short', 'short', 'short'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('short', 'short', 'sideway'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('short', 'sideway', 'long'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('short', 'sideway', 'short'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('short', 'sideway', 'sideway'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('sideway', 'long', 'long'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('sideway', 'long', 'short'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('sideway', 'long', 'sideway'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('sideway', 'short', 'long'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('sideway', 'short', 'short'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('sideway', 'short', 'sideway'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('sideway', 'sideway', 'long'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('sideway', 'sideway', 'short'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
+                    ('sideway', 'sideway', 'sideway'): ['trend_long', 'trend_short', 'mean_rev_long', 'mean_rev_short'],
                 }
                 
                 # 獲取對應的策略

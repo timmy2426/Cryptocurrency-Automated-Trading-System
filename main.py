@@ -212,20 +212,21 @@ def main():
                 # 獲取當前時間
                 now = datetime.now()
                 
-                # 計算到下一個15分鐘的等待時間
+                # 計算到下一個1小時的等待時間
                 next_time = now.replace(
-                    minute=((now.minute // 15 + 1) * 15) % 60, 
+                    hour=(now.hour + 1) % 24,
+                    minute=0,
                     second=0,
                     microsecond=0
                 )
                 
-                # 如果計算出的時間已經過去，加15分鐘
+                # 如果計算出的時間已經過去，加1小時
                 while next_time <= now:
-                    next_time += timedelta(minutes=15)
+                    next_time += timedelta(hours=1)
                     
                 wait_seconds = (next_time - now).total_seconds()
                 
-                # 等待到下一個15分鐘
+                # 等待到下一個1小時
                 time.sleep(wait_seconds)
                 
                 # 記錄執行時間

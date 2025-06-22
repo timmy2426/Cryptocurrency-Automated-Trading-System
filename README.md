@@ -6,13 +6,13 @@
 
 ## 專案概述
 
-這是一個基於 Python 開發的加密貨幣 U 本位期貨交易系統，主要針對 Binance 期貨市場進行自動化交易。系統採用模組化設計，具有完整的風險控制機制和即時監控功能。
+這是一個基於 Python 開發的加密貨幣 U 本位期貨交易系統，主要針對 Binance 期貨市場進行自動化交易。系統採用模組化設計，具有完整的風險控制機制和即時監控功能。同時內建回測模組，可利用歷史資料進行策略測試與績效評估。
 
 ## 交易策略
 
 ### 技術指標
 
-- 使用 15 分鐘 K 線時間框架為主進行技術分析
+- 使用 1 小時 K 線時間框架為主進行技術分析
 - 使用布林通道搭配 RSI 進行交易訊號判斷
 - 使用多週期 SMA 快慢線判斷趨勢方向
 
@@ -78,79 +78,72 @@
 
 ## 系統架構
 
-### 核心模組
+### 🔄 **實盤交易系統**
 
-- **BinanceAPI** (`exchange/binance_api.py`)
+- **Trader (交易執行器)**: 負責策略執行、信號處理和交易決策
+- **PositionManager (倉位管理器)**: 管理所有開倉、平倉操作，包含風險控制和帳戶權益追蹤
+- **SignalGenerator (信號生成器)**: 基於技術指標生成交易信號
+- **RiskControl (風險控制)**: 實現止損、止盈、倉位大小控制等風險管理功能
+- **EventLogger (事件日誌)**: 記錄所有交易事件和系統狀態
 
-  - 封裝 Binance 期貨 API
-  - 處理 REST API 請求
-  - 管理 WebSocket 連接
-  - 處理訂單和倉位更新
+### 📊 **回測引擎**
 
-- **PositionManager** (`core/position_manager.py`)
+- **BacktestEngine (回測引擎)**: 模擬歷史交易環境，驗證策略有效性
+- **Broker (模擬經紀商)**: 模擬真實交易環境的滑點、手續費等
+- **DataManager (數據管理)**: 管理歷史 K 線數據的下載和處理
+- **Metrics (績效分析)**: 計算各種績效指標，生成詳細分析報告
 
-  - 管理交易倉位
-  - 計算倉位大小
-  - 控制風險參數
-  - 處理止損止盈
+### 🔌 **交易所介面**
 
-- **Trader** (`core/trader.py`)
+- **BinanceAPI (Binance API)**: 封裝 Binance 期貨 API，支援 REST 和 WebSocket
+- **OrderExecutor (訂單執行器)**: 處理訂單創建、修改、取消等操作
+- **Converter (數據轉換器)**: 統一數據格式，處理不同時間框架的轉換
 
-  - 執行交易策略
-  - 管理交易信號
-  - 控制交易流程
+### 📈 **數據處理系統**
 
-### 支援模組
+- **DataLoader (數據加載器)**: 從 Binance 下載歷史和即時 K 線數據
+- **TechnicalIndicators (技術指標)**: 實現各種技術分析指標（MA、RSI、MACD 等）
 
-- **DataLoader** (`data/data_loader.py`)
+### 🔔 **通知系統**
 
-  - 獲取市場數據
-  - 處理 K 線數據
-  - 計算技術指標
+- **Discord Bot**: 透過 Discord Webhook 發送交易通知、錯誤警報和健康狀態
+- **HealthCheck (健康檢查)**: 監控系統運行狀態，定期發送心跳訊息
 
-- **EventLogger** (`core/event_logger.py`)
+## 特色功能
 
-  - 記錄交易事件
-  - 記錄錯誤日誌
-  - 生成交易報告
+### 🛡️ **完整的風險管理**
 
-- **Discord Bot** (`discord_bot/`)
-
-  - 格式化消息
-  - 發送交易通知
-  - 發送心跳通知
-
-## 主要功能
-
-### 交易功能
-
-- 自動化交易執行
-- 多種訂單類型支援
-- 追蹤止損功能
-- 倉位管理
-
-### 風險控制
-
-- 保證金使用率限制
-- 單日虧損限制
-- 交易次數限制
-- 冷卻期機制
-- 滑價控制
-
-### 監控功能
-
-- 即時倉位監控
-- 訂單狀態追蹤
+- 動態止損止盈機制
+- 倉位大小自動計算
+- 最大回撤控制
 - 帳戶權益監控
-- 交易統計分析
 
-## 技術特點
+### 📊 **雙模式績效分析**
 
-- 模組化設計
-- 多線程機制
-- 自動重連機制
-- 完整的錯誤處理
-- 詳細的日誌記錄
+- **實盤績效分析**: 基於實際交易記錄，自動偵測初始權益值
+- **回測績效分析**: 基於歷史數據模擬，支援多種績效指標
+- **統一報告格式**: 兩種模式使用相同的分析邏輯和報告格式
+
+### 🔄 **即時監控與通知**
+
+- Discord 即時通知系統
+- 交易狀態即時更新
+- 系統健康狀態監控
+- 錯誤警報和異常處理
+
+### 🧪 **完整的測試覆蓋**
+
+- 單元測試覆蓋所有核心模組
+- 模擬交易環境測試
+- API 連接穩定性測試
+- 績效計算準確性驗證
+
+### ⚙️ **靈活的配置管理**
+
+- YAML 配置文件支援
+- 環境變數管理
+- 測試網/主網切換
+- 多交易對支援
 
 ## 配置說明
 
@@ -166,14 +159,37 @@
 
 - Python 3.8+
 - 相關套件：
-  - binance-futures-connector
-  - python-dotenv
-  - pandas
-  - pyyaml
-  - websocket-client
-  - discord-webhook
-  - numpy
-  - pytest
+
+### 核心套件
+
+- **binance-futures-connector==4.1.0** - Binance 期貨 API 連接器
+- **python-dotenv==1.0.0** - 環境變數管理
+- **pyyaml==6.0.1** - YAML 配置文件解析
+
+### 數據處理
+
+- **pandas==2.0.3** - 數據分析和處理
+- **numpy==1.24.3** - 數值計算
+
+### 網路連接
+
+- **websocket-client==1.8.0** - WebSocket 連接管理
+- **discord-webhook==1.2.0** - Discord 通知功能
+
+### 工具套件
+
+- **tqdm==4.66.1** - 進度條顯示（數據下載）
+- **openpyxl==3.1.2** - Excel 報告生成
+
+### 測試
+
+- **pytest==7.4.0** - 單元測試框架
+
+### 安裝指令
+
+```bash
+pip install -r requirements.txt
+```
 
 ## 使用說明
 
@@ -244,17 +260,32 @@
 
 ### 風險控制參數 (Risk Control)
 
-| 參數                    | 說明                |
-| ----------------------- | ------------------- |
-| risk_per_trade          | 每筆交易風險比例    |
-| max_margin_usage        | 最大保證金使用率    |
-| slippage_percent        | 最大滑點百分比（%） |
-| max_holding_bars        | 最大持倉 K 棒數     |
-| max_daily_trades        | 每日最大交易次數    |
-| max_daily_loss          | 每日最大虧損比例    |
-| consecutive_losses      | 連續虧損次數限制    |
-| cooldown_period         | 冷卻期時間（秒）    |
-| min_bandwidth_threshold | 最小布林帶寬閾值    |
+| 參數                      | 說明                    |
+| ------------------------- | ----------------------- |
+| risk_per_trade            | 每筆交易風險比例        |
+| max_margin_usage          | 最大保證金使用率        |
+| slippage_percent          | 最大滑點百分比（%）     |
+| max_trend_holding_bars    | 最大順勢策略持倉 K 棒數 |
+| max_mean_rev_holding_bars | 最大逆勢策略持倉 K 棒數 |
+| max_daily_trades          | 每日最大交易次數        |
+| max_daily_loss            | 每日最大虧損比例        |
+| consecutive_losses        | 連續虧損次數限制        |
+| cooldown_period           | 冷卻期時間（秒）        |
+| min_bandwidth_threshold   | 最小布林帶寬閾值        |
+
+### 回測主程式參數 (Back Test)
+
+| 參數名稱        | 說明                      |
+| --------------- | ------------------------- |
+| start_date      | 回測開始日期 (YYYY-MM-DD) |
+| end_date        | 回測結束日期 (YYYY-MM-DD) |
+| symbol          | 回測交易對列表            |
+| leverage        | 槓桿倍數                  |
+| slippage        | 滑點率                    |
+| fee             | 手續費率                  |
+| initial_balance | 初始資金 (USDT)           |
+| risk_free_rate  | 無風險利率數值            |
+| force_update    | 是否強制更新歷史數據      |
 
 ## 注意事項
 

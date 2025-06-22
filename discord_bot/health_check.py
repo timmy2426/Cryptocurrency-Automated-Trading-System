@@ -82,11 +82,34 @@ class HealthCheck:
                 # 獲取當前時間
                 now = datetime.now()
                 
-                # 計算到下一個整點的等待時間
-                next_hour = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
-                wait_seconds = (next_hour - now).total_seconds()
+                # 計算到下一個4小時整點的等待時間
+                next_hour = (now.hour // 4 + 1) * 4
+                # 確保小時在0-23範圍內
+                if next_hour >= 24:
+                    next_hour = 0
+                    # 如果跨日，需要加一天
+                    next_4hour = now.replace(
+                        day=now.day + 1,
+                        hour=next_hour,
+                        minute=0, 
+                        second=0, 
+                        microsecond=0
+                    )
+                else:
+                    next_4hour = now.replace(
+                        hour=next_hour,
+                        minute=0, 
+                        second=0, 
+                        microsecond=0
+                    )
                 
-                # 等待到下一個整點
+                # 如果計算出的時間已經過去，加4小時
+                while next_4hour <= now:
+                    next_4hour += timedelta(hours=4)
+                    
+                wait_seconds = (next_4hour - now).total_seconds()
+                
+                # 等待到下一個4小時整點
                 time.sleep(wait_seconds)
                 
             except Exception as e:

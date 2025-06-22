@@ -1,8 +1,25 @@
+# Binance API 相關
 binance-futures-connector==4.1.0
+
+# 環境變數和配置
 python-dotenv==1.0.0
-pandas==2.0.3
 pyyaml==6.0.1
-websocket-client==1.8.0
-discord-webhook==1.2.0
+
+# 數據處理和分析
+pandas==2.0.3
 numpy==1.24.3
+
+# WebSocket 連接
+websocket-client==1.8.0
+
+# Discord 通知
+discord-webhook==1.2.0
+
+# 進度條顯示
+tqdm==4.66.1
+
+# Excel 報告生成
+openpyxl==3.1.2
+
+# 測試框架
 pytest==7.4.0

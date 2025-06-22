@@ -17,7 +17,7 @@ binance_api:
 
 index:
   bb_length: 20
-  bb_mult: 1.5
+  bb_mult: 2
   bb_change_rate: 0.3
   bb_change_rate_window: 3
   bb_price_threshold: 0.002
@@ -29,7 +29,7 @@ index:
   rsi_average_window: 3
   ma_slow_length: 50
   ma_slope_window: 6
-  ma_slope_threshold: 20
+  ma_slope_threshold: 10
   atr_period: 14
   average_volume_window: 6
   average_volume_scale: 1.2
@@ -46,19 +46,20 @@ trading:
     - ADAUSDT
   leverage: 5
   price_protect: true
-  activate_price_rate: 0.012
-  trailing_percent: 1 #百分比%
-  max_loss_percent: 0.01
-  mean_reversion_tp: 0.01
-  mean_reversion_sl: 0.005
+  activate_price_rate: 0.05
+  trailing_percent: 1.5 #百分比%
+  max_loss_percent: 0.02
+  mean_reversion_tp: 0.03
+  mean_reversion_sl: 0.01
 
 risk_control:
   risk_per_trade: 0.005
   max_margin_usage: 0.7
   slippage_percent: 0.5 #百分比%
-  max_holding_bars: 16
-  max_daily_trades: 30
-  max_daily_loss: 0.05
+  max_trend_holding_bars: 16
+  max_mean_rev_holding_bars: 8
+  max_daily_trades: 15
+  max_daily_loss: 0.02
   consecutive_losses: 5
-  cooldown_period: 3600
+  cooldown_period: 14400
   min_bandwidth_threshold: 0.01

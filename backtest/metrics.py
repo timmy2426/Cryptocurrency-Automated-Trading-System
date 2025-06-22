@@ -10,21 +10,24 @@ from openpyxl.utils import get_column_letter
 from typing import Tuple, Dict
 
 class PerformanceMetrics:
-    """實盤績效計算類別（完全依照回測邏輯）"""
+    """績效計算類別"""
     
-    def __init__(self, config: dict = None):
+    def __init__(self, config: dict, file_name: str = None):
         """
         初始化績效計算類別
         
         Args:
             config: 配置參數，包含：
                 - risk_free_rate: 無風險利率
+                - initial_balance: 初始資金
+            file_name: 指定的交易記錄檔案名稱，如果為None則讀取backtest_log目錄下所有檔案
         """
-        self.config = config or {}
-        self.risk_free_rate = self.config.get('risk_free_rate', 0.025)
-        self.initial_balance = None 
+        self.config = config
+        self.risk_free_rate = config.get('risk_free_rate', 0.025)
+        self.initial_balance = config.get('initial_balance', 10000)
+        self.file_name = file_name
         
-        # 策略名稱對照表（與回測一致）
+        # 策略名稱對照表
         self.strategy_name_map = {
             'trend_long': '順勢做多',
             'trend_short': '順勢做空',
@@ -33,7 +36,7 @@ class PerformanceMetrics:
             'MANUAL': '手動買賣'
         }
         
-        # 盤勢名稱對照表（與回測一致）
+        # 盤勢名稱對照表
         self.market_condition_map = {
             'long': '多頭',
             'short': '空頭',
@@ -42,42 +45,69 @@ class PerformanceMetrics:
         
         # 初始化數據目錄
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
-        self.log_dir = os.path.join(self.base_dir, "trade_log")
+        self.log_dir = os.path.join(self.base_dir, "backtest_log")
         
     def _ensure_numeric_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        確保數值欄位為正確的型別（與回測一致）
+        確保指定的數值欄位為正確的數值型別
         
         Args:
-            df: 數據框
+            df: 要處理的數據框
             
         Returns:
             pd.DataFrame: 處理後的數據框
         """
-        numeric_columns = ['open_price', 'open_amt', 'open_size', 'close_price', 
-                          'close_amt', 'close_size', 'pnl', 'pnl_percentage', 'account_equity']
+        # 定義需要轉換為數值的欄位
+        numeric_columns = ['pnl', 'pnl_percentage', 'open_price', 'close_price', 
+                          'open_amt', 'close_amt', 'open_size', 'close_size', 'margin']
         
+        # 對存在的欄位進行數值轉換
         for col in numeric_columns:
             if col in df.columns:
+                # 記錄轉換前的無效數據數量
+                original_invalid_count = pd.to_numeric(df[col], errors='coerce').isna().sum()
+                
+                # 執行轉換
                 df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+                # 記錄轉換後的無效數據數量
+                final_invalid_count = df[col].isna().sum()
+                
+                # 如果發現新的無效值，表示有數據轉換失敗
+                if final_invalid_count > original_invalid_count:
+                    print(f"警告: 在欄位 '{col}' 中發現 {final_invalid_count - original_invalid_count} 個無法解析的數值。它們已被設置為 NaN。")
+                
+                # 將 NaN 值填充為 0，以避免計算錯誤，這是一個重要的修正
+                df[col] = df[col].fillna(0)
                 
         return df
         
     def load_trade_logs(self) -> pd.DataFrame:
         """
-        載入交易記錄（完全依照回測邏輯，但適應實盤結構）
+        載入交易記錄
         
         Returns:
             pd.DataFrame: 交易記錄數據框
         """
         all_records = []
         
-        # 讀取目錄下所有檔案
-        for file_path in glob(os.path.join(self.log_dir, "*.jsonl")):
+        if self.file_name:
+            # 讀取指定的檔案
+            file_path = os.path.join(self.log_dir, self.file_name)
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"找不到指定的交易記錄檔案: {file_path}")
+                
             with open(file_path, "r") as f:
                 for line in f:
                     record = json.loads(line)
                     all_records.append(record)
+        else:
+            # 讀取目錄下所有檔案
+            for file_path in glob(os.path.join(self.log_dir, "*.jsonl")):
+                with open(file_path, "r") as f:
+                    for line in f:
+                        record = json.loads(line)
+                        all_records.append(record)
         
         df = pd.DataFrame(all_records)
         
@@ -88,36 +118,19 @@ class PerformanceMetrics:
             # 統一新增 date 欄位
             df['date'] = pd.to_datetime(df['open_time']).dt.date
             
-            # 處理實盤的 market_condition（直接是 list）
+            # 從 market_condition 提取 trend_filter (應為 list)
             df['trend_filter'] = df['market_condition'].apply(
-                lambda x: x if isinstance(x, list) else []
+                lambda x: x.get('trend_filter') if isinstance(x, dict) and x.get('trend_filter') else []
             )
             
-            # 基於 trend_filter list 創建 tuple 以便分組
+            # 基於 trend_filter list 創建 tuple 以便分組 (保留順序和重複)
             df['trend_combination'] = df['trend_filter'].apply(tuple)
-            
-            # 自動偵測初始權益值：找到最早的交易紀錄中的帳戶權益
-            if 'account_equity' in df.columns:
-                # 按開倉時間排序，找到最早的交易
-                df_sorted = df.sort_values('open_time')
-                earliest_trade = df_sorted.iloc[0]
-                
-                if pd.notna(earliest_trade['account_equity']):
-                    # 使用最早交易的帳戶權益作為初始權益值
-                    initial_equity = earliest_trade['account_equity']
-                    self.initial_balance = float(initial_equity)
-                else:
-                    raise ValueError("錯誤：最早交易紀錄中沒有帳戶權益記錄，無法計算初始權益值")
-            else:
-                raise ValueError("錯誤：交易記錄中沒有帳戶權益欄位，無法計算初始權益值")
-        else:
-            raise ValueError("錯誤：沒有找到任何交易記錄，無法進行績效分析")
             
         return df
         
     def _round_metrics(self, data):
         """
-        將結果中的浮點數四捨五入到小數點後兩位（與回測一致）
+        將結果中的浮點數四捨五入到小數點後兩位
         """
         if isinstance(data, dict):
             result = {}
@@ -136,7 +149,7 @@ class PerformanceMetrics:
         
     def calculate_daily_metrics(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict]:
         """
-        計算每日績效指標（完全依照回測邏輯）
+        計算每日績效指標
         
         Args:
             df: 交易記錄數據框
@@ -237,7 +250,7 @@ class PerformanceMetrics:
         
     def calculate_common_metrics(self, group: pd.DataFrame) -> dict:
         """
-        計算共同的績效指標（完全依照回測邏輯）
+        計算共同的績效指標
         
         Args:
             group: 交易記錄數據框
@@ -331,7 +344,7 @@ class PerformanceMetrics:
         
     def calculate_symbol_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        計算各交易對的績效指標（完全依照回測邏輯）
+        計算各交易對的績效指標
         
         Args:
             df: 交易記錄數據框
@@ -358,7 +371,7 @@ class PerformanceMetrics:
         
     def calculate_strategy_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        計算每個策略的績效指標（完全依照回測邏輯）
+        計算每個策略的績效指標
         
         Args:
             df: 交易記錄數據框
@@ -389,7 +402,7 @@ class PerformanceMetrics:
 
     def calculate_market_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        計算不同盤勢下的績效指標，支持27種組合（完全依照回測邏輯）
+        計算不同盤勢下的績效指標，支持27種組合
         
         Args:
             df: 交易記錄數據框
@@ -427,9 +440,9 @@ class PerformanceMetrics:
 
     def export_to_excel(self, daily_df: pd.DataFrame, summary_dict: dict, 
                        symbol_df: pd.DataFrame, strategy_df: pd.DataFrame, 
-                       market_df: pd.DataFrame, output_file: str = "實盤績效分析報告.xlsx") -> None:
+                       market_df: pd.DataFrame, output_file: str = "回測績效分析報告.xlsx") -> None:
         """
-        匯出績效報告到Excel（完全依照回測格式）
+        匯出績效報告到Excel
         
         Args:
             daily_df: 每日績效數據框
@@ -439,7 +452,7 @@ class PerformanceMetrics:
             market_df: 盤勢績效數據框
             output_file: 輸出文件名
         """
-        # 定義共同績效指標的順序（與回測一致）
+        # 定義共同績效指標的順序
         common_columns = [
             '交易次數 (筆)', '總盈虧 (USDT)', '勝率 (%)', '年化報酬率 (%)', '平均獲利 (USDT)', '平均虧損 (USDT)', '盈虧比', 
             '最大回撤 (USDT)', '最大回撤 (%)', '獲利因子', '夏普比率', '卡瑪比率', '平均持倉時間 (分鐘)'
@@ -537,7 +550,7 @@ class PerformanceMetrics:
         except PermissionError:
             print(f"無法寫入文件 {output_file}，請確保文件未被其他程序使用。")
             # 嘗試使用不同的文件名
-            new_output_file = f"實盤績效分析報告_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            new_output_file = f"回測績效分析報告_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
             print(f"嘗試使用新的文件名: {new_output_file}")
             self.export_to_excel(daily_df, summary_dict, symbol_df, strategy_df, market_df, new_output_file)
             
@@ -557,23 +570,6 @@ class PerformanceMetrics:
         
         # 匯出績效報告到根目錄
         root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        output_file = os.path.join(root_dir, "實盤績效分析報告.xlsx")
+        output_file = os.path.join(root_dir, f"回測績效分析報告_{self.file_name}.xlsx")
         self.export_to_excel(daily_df, summary, symbol_df, strategy_df, market_df, output_file)
         print(f"分析報告已匯出至: {output_file}")
-
-# 主執行函數
-def main():
-    """主執行函數"""
-    # 配置參數（可根據需要調整）
-    config = {
-        'risk_free_rate': 0.025
-    }
-    
-    # 創建績效分析實例
-    metrics = PerformanceMetrics(config)
-    
-    # 執行分析
-    metrics.run()
-
-if __name__ == "__main__":
-    main()
