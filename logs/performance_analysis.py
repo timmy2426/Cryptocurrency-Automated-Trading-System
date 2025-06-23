@@ -10,7 +10,7 @@ from openpyxl.utils import get_column_letter
 from typing import Tuple, Dict
 
 class PerformanceMetrics:
-    """實盤績效計算類別（完全依照回測邏輯）"""
+    """實盤績效計算類別"""
     
     def __init__(self, config: dict = None):
         """
@@ -24,7 +24,7 @@ class PerformanceMetrics:
         self.risk_free_rate = self.config.get('risk_free_rate', 0.025)
         self.initial_balance = None 
         
-        # 策略名稱對照表（與回測一致）
+        # 策略名稱對照表
         self.strategy_name_map = {
             'trend_long': '順勢做多',
             'trend_short': '順勢做空',
@@ -33,7 +33,7 @@ class PerformanceMetrics:
             'MANUAL': '手動買賣'
         }
         
-        # 盤勢名稱對照表（與回測一致）
+        # 盤勢名稱對照表
         self.market_condition_map = {
             'long': '多頭',
             'short': '空頭',
@@ -46,7 +46,7 @@ class PerformanceMetrics:
         
     def _ensure_numeric_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        確保數值欄位為正確的型別（與回測一致）
+        確保數值欄位為正確的型別
         
         Args:
             df: 數據框
@@ -65,7 +65,7 @@ class PerformanceMetrics:
         
     def load_trade_logs(self) -> pd.DataFrame:
         """
-        載入交易記錄（完全依照回測邏輯，但適應實盤結構）
+        載入交易記錄
         
         Returns:
             pd.DataFrame: 交易記錄數據框
@@ -117,7 +117,7 @@ class PerformanceMetrics:
         
     def _round_metrics(self, data):
         """
-        將結果中的浮點數四捨五入到小數點後兩位（與回測一致）
+        將結果中的浮點數四捨五入到小數點後兩位
         """
         if isinstance(data, dict):
             result = {}
@@ -136,7 +136,7 @@ class PerformanceMetrics:
         
     def calculate_daily_metrics(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict]:
         """
-        計算每日績效指標（完全依照回測邏輯）
+        計算每日績效指標
         
         Args:
             df: 交易記錄數據框
@@ -237,7 +237,7 @@ class PerformanceMetrics:
         
     def calculate_common_metrics(self, group: pd.DataFrame) -> dict:
         """
-        計算共同的績效指標（完全依照回測邏輯）
+        計算共同的績效指標
         
         Args:
             group: 交易記錄數據框
@@ -331,7 +331,7 @@ class PerformanceMetrics:
         
     def calculate_symbol_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        計算各交易對的績效指標（完全依照回測邏輯）
+        計算各交易對的績效指標
         
         Args:
             df: 交易記錄數據框
@@ -358,7 +358,7 @@ class PerformanceMetrics:
         
     def calculate_strategy_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        計算每個策略的績效指標（完全依照回測邏輯）
+        計算每個策略的績效指標
         
         Args:
             df: 交易記錄數據框
@@ -389,7 +389,7 @@ class PerformanceMetrics:
 
     def calculate_market_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        計算不同盤勢下的績效指標，支持27種組合（完全依照回測邏輯）
+        計算不同盤勢下的績效指標，支持27種組合
         
         Args:
             df: 交易記錄數據框
@@ -429,7 +429,7 @@ class PerformanceMetrics:
                        symbol_df: pd.DataFrame, strategy_df: pd.DataFrame, 
                        market_df: pd.DataFrame, output_file: str = "實盤績效分析報告.xlsx") -> None:
         """
-        匯出績效報告到Excel（完全依照回測格式）
+        匯出績效報告到Excel
         
         Args:
             daily_df: 每日績效數據框
@@ -439,7 +439,7 @@ class PerformanceMetrics:
             market_df: 盤勢績效數據框
             output_file: 輸出文件名
         """
-        # 定義共同績效指標的順序（與回測一致）
+        # 定義共同績效指標的順序
         common_columns = [
             '交易次數 (筆)', '總盈虧 (USDT)', '勝率 (%)', '年化報酬率 (%)', '平均獲利 (USDT)', '平均虧損 (USDT)', '盈虧比', 
             '最大回撤 (USDT)', '最大回撤 (%)', '獲利因子', '夏普比率', '卡瑪比率', '平均持倉時間 (分鐘)'

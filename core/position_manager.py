@@ -465,7 +465,10 @@ class PositionManager:
                     trailing_stop=self.positions[symbol].get('trailing_stop'),
                     price_rate=self.positions[symbol].get('price_rate')
                 )
-                
+
+                # 紀錄帳戶權益
+                self.positions[symbol]['account_equity'] = self.account_info['account_equity']
+
                 # 發送開倉消息
                 self.send_message.send_open_position_message(embed)
                 logger.info(f"成功發送交易對 {symbol} 的開倉消息")
@@ -526,9 +529,6 @@ class PositionManager:
                 # 發送平倉消息
                 self.send_message.send_close_position_message(embed)
                 logger.info(f"成功發送交易對 {symbol} 的平倉消息")
-
-                # 紀錄帳戶權益
-                self.positions[symbol]['account_equity'] = self.account_info['account_equity']
 
                 # 設置平倉消息已發送標記
                 self.positions[symbol]['is_close_message_sent'] = True

@@ -80,34 +80,34 @@
 
 ### 🔄 **實盤交易系統**
 
-- **Trader (交易執行器)**: 負責策略執行、信號處理和交易決策
-- **PositionManager (倉位管理器)**: 管理所有開倉、平倉操作，包含風險控制和帳戶權益追蹤
-- **SignalGenerator (信號生成器)**: 基於技術指標生成交易信號
-- **RiskControl (風險控制)**: 實現止損、止盈、倉位大小控制等風險管理功能
-- **EventLogger (事件日誌)**: 記錄所有交易事件和系統狀態
+- **Trader (交易執行器)**：負責策略執行、信號處理和交易決策
+- **PositionManager (倉位管理器)**：管理所有開倉、平倉操作，包含風險控制和帳戶權益追蹤
+- **SignalGenerator (信號生成器)**：基於技術指標生成交易信號
+- **RiskControl (風險控制)**：實現止損、止盈、倉位大小控制等風險管理功能
+- **EventLogger (事件日誌)**：記錄所有交易事件和系統狀態
 
 ### 📊 **回測引擎**
 
-- **BacktestEngine (回測引擎)**: 模擬歷史交易環境，驗證策略有效性
-- **Broker (模擬經紀商)**: 模擬真實交易環境的滑點、手續費等
-- **DataManager (數據管理)**: 管理歷史 K 線數據的下載和處理
-- **Metrics (績效分析)**: 計算各種績效指標，生成詳細分析報告
+- **BacktestEngine (回測引擎)**：模擬歷史交易環境，驗證策略有效性
+- **Broker (模擬經紀商)**：模擬真實交易環境的滑點、手續費等
+- **DataManager (數據管理)**：管理歷史 K 線數據的下載和處理
+- **Metrics (績效分析)**：計算各種績效指標，生成詳細分析報告
 
 ### 🔌 **交易所介面**
 
-- **BinanceAPI (Binance API)**: 封裝 Binance 期貨 API，支援 REST 和 WebSocket
-- **OrderExecutor (訂單執行器)**: 處理訂單創建、修改、取消等操作
-- **Converter (數據轉換器)**: 統一數據格式，處理不同時間框架的轉換
+- **BinanceAPI (Binance API)**：封裝 Binance 期貨 API，支援 REST 和 WebSocket
+- **OrderExecutor (訂單執行器)**：處理訂單創建、修改、取消等操作
+- **Converter (數據轉換器)**：統一數據格式，處理不同時間框架的轉換
 
 ### 📈 **數據處理系統**
 
-- **DataLoader (數據加載器)**: 從 Binance 下載歷史和即時 K 線數據
-- **TechnicalIndicators (技術指標)**: 實現各種技術分析指標（MA、RSI、MACD 等）
+- **DataLoader (數據加載器)**：從 Binance 下載歷史和即時 K 線數據
+- **TechnicalIndicators (技術指標)**：實現各種技術分析指標（MA、RSI、MACD 等）
 
 ### 🔔 **通知系統**
 
-- **Discord Bot**: 透過 Discord Webhook 發送交易通知、錯誤警報和健康狀態
-- **HealthCheck (健康檢查)**: 監控系統運行狀態，定期發送心跳訊息
+- **Discord Bot**：透過 Discord Webhook 發送交易通知、錯誤警報和健康狀態
+- **HealthCheck (健康檢查)**：監控系統運行狀態，定期發送心跳訊息
 
 ## 特色功能
 
@@ -120,9 +120,9 @@
 
 ### 📊 **雙模式績效分析**
 
-- **實盤績效分析**: 基於實際交易記錄，自動偵測初始權益值
-- **回測績效分析**: 基於歷史數據模擬，支援多種績效指標
-- **統一報告格式**: 兩種模式使用相同的分析邏輯和報告格式
+- **實盤績效分析**：基於實際交易記錄，自動偵測初始權益值
+- **回測績效分析**：基於歷史數據模擬，支援多種績效指標
+- **統一報告格式**：兩種模式使用相同的分析邏輯和報告格式
 
 ### 🔄 **即時監控與通知**
 
@@ -162,28 +162,28 @@
 
 ### 核心套件
 
-- **binance-futures-connector==4.1.0** - Binance 期貨 API 連接器
-- **python-dotenv==1.0.0** - 環境變數管理
-- **pyyaml==6.0.1** - YAML 配置文件解析
+- **binance-futures-connector** - Binance 期貨 API 連接器
+- **python-dotenv** - 環境變數管理
+- **pyyaml** - YAML 配置文件解析
 
 ### 數據處理
 
-- **pandas==2.0.3** - 數據分析和處理
-- **numpy==1.24.3** - 數值計算
+- **pandas** - 數據分析和處理
+- **numpy** - 數值計算
 
 ### 網路連接
 
-- **websocket-client==1.8.0** - WebSocket 連接管理
-- **discord-webhook==1.2.0** - Discord 通知功能
+- **websocket-client** - WebSocket 連接管理
+- **discord-webhook** - Discord 通知功能
 
 ### 工具套件
 
-- **tqdm==4.66.1** - 進度條顯示（數據下載）
-- **openpyxl==3.1.2** - Excel 報告生成
+- **tqdm** - 進度條顯示（數據下載）
+- **openpyxl** - Excel 報告生成
 
 ### 測試
 
-- **pytest==7.4.0** - 單元測試框架
+- **pytest** - 單元測試框架
 
 ### 安裝指令
 
