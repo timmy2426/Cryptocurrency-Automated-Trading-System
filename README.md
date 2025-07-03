@@ -1,7 +1,7 @@
 # 加密貨幣自動交易系統
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/timmy2426/Cryptocurrency-Automated-Trading-System)&nbsp;
-[![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)&nbsp;
+[![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)&nbsp;
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-orange.svg)](https://www.gnu.org/licenses/agpl-3.0.html)&nbsp;
 
 ## 專案概述
@@ -157,7 +157,7 @@
 
 ## 安裝需求
 
-- Python 3.8+
+- Python 3.9+
 - 相關套件：
 
 ### 核心套件

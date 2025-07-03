@@ -129,56 +129,9 @@ class BacktestEngine:
                     if isinstance(current_time, datetime):
                         current_time = int(current_time.timestamp() * 1000)
                     
-                    # 處理現有倉位
+                    # 處理已存在的倉位
                     if symbol in self.broker.positions:
-                        
-                        # 檢查被動出場
-                        high_price = Decimal(str(df_1h['high'].iloc[i-1]))
-                        low_price = Decimal(str(df_1h['low'].iloc[i-1]))
-                        
-                        # 檢查止損
-                        if position and position['stop_loss'] is not None:
-                            if self.broker.check_stop_loss(symbol, high_price, low_price, current_time):
-                                price = position['stop_loss']
-                                self.broker.close_position(symbol, price, current_time, "STOP_LOSS")
-                                continue
-                                
-                        # 檢查止盈
-                        if position and position['take_profit'] is not None:
-                            if self.broker.check_take_profit(symbol, high_price, low_price, current_time):
-                                price = position['take_profit']
-                                self.broker.close_position(symbol, price, current_time, "TAKE_PROFIT")
-                                continue
-                                
-                        # 檢查移動止損
-                        if position and position['trailing_stop'] is not None:
-                            if self.broker.check_trailing_stop(symbol, high_price, low_price):
-                                price = position['stop_loss']
-                                self.broker.close_position(symbol, price, current_time, "TRAILING_STOP")
-                                continue
-                            
-                        # 計算指標
-                        indicators = self.signal_generator.calculate_indicators(df_1h.iloc[:i])
-                        
-                        # 檢查主動出場信號
-                        should_close = False
-                        is_trend = position['strategy'].startswith("trend")
-                        if is_trend:
-                            if position['side'] == "BUY":
-                                should_close = self.signal_generator.is_trend_long_exit(df_1h.iloc[:i], indicators).iloc[-1]
-                            else:
-                                should_close = self.signal_generator.is_trend_short_exit(df_1h.iloc[:i], indicators).iloc[-1]
-                        else:  # mean_reversion
-                            if position['side'] == "BUY":
-                                should_close = self.signal_generator.is_mean_rev_long_exit(df_1h.iloc[:i], indicators).iloc[-1]
-                            else:
-                                should_close = self.signal_generator.is_mean_rev_short_exit(df_1h.iloc[:i], indicators).iloc[-1]
-
-                        close_position = self.broker.can_close_position(symbol, current_time, is_trend)
-                                
-                        if should_close or close_position:
-                            self.broker.close_position(symbol, current_price, current_time, "MANUAL")
-                            continue
+                        self._handle_existing_position(symbol, position, df_1h, i, current_time, current_price)
                             
                     # 檢查是否可以開新倉
                     if not self.broker.can_open_position(current_time):
@@ -187,87 +140,7 @@ class BacktestEngine:
 
                     # 處理開倉邏輯
                     if symbol not in self.broker.positions:
-                        
-                        # 計算指標
-                        indicators = self.signal_generator.calculate_indicators(df_1h.iloc[:i])
-                        
-                        # 選擇策略
-                        selected_strategy = self.strategy.select(
-                            symbol,
-                            df_1h.iloc[:i+1],
-                            df_4h_until_now,
-                            df_1d_until_now
-                        )
-                        
-                        if selected_strategy == "no_trade":
-                            continue
-                            
-                        # 根據策略開倉
-                        if selected_strategy.endswith("long"):
-                            side = "BUY"
-                        else:
-                            side = "SELL"
-                            
-                        # 計算倉位大小
-                        is_trend = selected_strategy.startswith("trend")
-                        amount = self.broker.calculate_position_size(
-                            current_price=current_price,
-                            is_trend=is_trend,
-                            df=df_1h.iloc[:i+1]
-                        )
-                        
-                        # 開倉
-                        if is_trend:
-                            self.broker.open_position(
-                                symbol=symbol,
-                                side=side,
-                                amount=amount,
-                                price=current_price,
-                                timestamp=current_time,
-                                strategy=selected_strategy,
-                                stop_loss=self.broker.set_stop_loss(is_trend, current_price, side),
-                                trailing_stop=self.broker.set_trailing_activate_price(current_price, side),
-                                price_rate=self.broker.set_trailing_price_rate()
-                            )
-                        else:
-                            self.broker.open_position(
-                                symbol=symbol,
-                                side=side,
-                                amount=amount,
-                                price=current_price,
-                                timestamp=current_time,
-                                strategy=selected_strategy,
-                                stop_loss=self.broker.set_stop_loss(is_trend, current_price, side),
-                                take_profit=self.broker.set_take_profit(current_price, side)
-                            )
-                        
-                        # 記錄市場條件
-                        self.broker.record_market_condition(symbol, current_time, df_1h.iloc[:i+1], df_4h_until_now, df_1d_until_now)
-                        
-                        # 檢查被動出場
-                        high_price = Decimal(str(df_1h['high'].iloc[i-1]))
-                        low_price = Decimal(str(df_1h['low'].iloc[i-1]))
-                        
-                        # 檢查止損
-                        if position and position['stop_loss'] is not None:
-                            if self.broker.check_stop_loss(symbol, high_price, low_price, current_time):
-                                price = position['stop_loss']
-                                self.broker.close_position(symbol, price, current_time, "STOP_LOSS")
-                                continue
-                                
-                        # 檢查止盈
-                        if position and position['take_profit'] is not None:
-                            if self.broker.check_take_profit(symbol, high_price, low_price, current_time):
-                                price = position['take_profit']
-                                self.broker.close_position(symbol, price, current_time, "TAKE_PROFIT")
-                                continue
-                                
-                        # 檢查移動止損
-                        if position and position['trailing_stop'] is not None:
-                            if self.broker.check_trailing_stop(symbol, high_price, low_price):
-                                price = position['stop_loss']
-                                self.broker.close_position(symbol, price, current_time, "TRAILING_STOP")
-                                continue
+                        self._process_open_position(symbol, position, df_1h, df_4h_until_now, df_1d_until_now, i, current_time, current_price)
                         
                 # 更新權益曲線
                 self.broker.equity_curve.append({
@@ -283,6 +156,149 @@ class BacktestEngine:
             
         except Exception as e:
             logger.error(f"執行回測失敗: {str(e)}")
+            raise
+    
+    def _handle_existing_position(self, symbol: str, position: dict, df_1h: pd.DataFrame, i: int, current_time: int, current_price: Decimal) -> None:
+        """處理已存在的倉位"""
+        try:
+            # 檢查被動出場
+            high_price = Decimal(str(df_1h['high'].iloc[i-1]))
+            low_price = Decimal(str(df_1h['low'].iloc[i-1]))
+            
+            # 檢查止損
+            if position and position['stop_loss'] is not None:
+                if self.broker.check_stop_loss(symbol, high_price, low_price, current_time):
+                    price = position['stop_loss']
+                    self.broker.close_position(symbol, price, current_time, "STOP_LOSS")
+                    return
+                    
+            # 檢查止盈
+            if position and position['take_profit'] is not None:
+                if self.broker.check_take_profit(symbol, high_price, low_price, current_time):
+                    price = position['take_profit']
+                    self.broker.close_position(symbol, price, current_time, "TAKE_PROFIT")
+                    return
+                    
+            # 檢查移動止損
+            if position and position['trailing_stop'] is not None:
+                if self.broker.check_trailing_stop(symbol, high_price, low_price):
+                    price = position['stop_loss']
+                    self.broker.close_position(symbol, price, current_time, "TRAILING_STOP")
+                    return
+                
+            # 計算指標
+            indicators = self.signal_generator.calculate_indicators(df_1h.iloc[:i])
+            
+            # 檢查主動出場信號
+            should_close = False
+            is_trend = position['strategy'].startswith("trend")
+            if is_trend:
+                if position['side'] == "BUY":
+                    should_close = self.signal_generator.is_trend_long_exit(df_1h.iloc[:i], indicators).iloc[-1]
+                else:
+                    should_close = self.signal_generator.is_trend_short_exit(df_1h.iloc[:i], indicators).iloc[-1]
+            else:  # mean_reversion
+                if position['side'] == "BUY":
+                    should_close = self.signal_generator.is_mean_rev_long_exit(df_1h.iloc[:i], indicators).iloc[-1]
+                else:
+                    should_close = self.signal_generator.is_mean_rev_short_exit(df_1h.iloc[:i], indicators).iloc[-1]
+
+            close_position = self.broker.can_close_position(symbol, current_time, is_trend)
+                    
+            if should_close or close_position:
+                self.broker.close_position(symbol, current_price, current_time, "MANUAL")
+                return
+            
+        except Exception as e:
+            logger.error(f"處理已存在的倉位失敗: {str(e)}")
+            raise
+
+    def _process_open_position(self, symbol: str, position: dict, df_1h: pd.DataFrame, df_4h_until_now: pd.DataFrame, df_1d_until_now: pd.DataFrame, i: int, current_time: int, current_price: Decimal) -> None:
+        """處理開倉邏輯"""
+        try:
+            # 計算指標
+            indicators = self.signal_generator.calculate_indicators(df_1h.iloc[:i])
+            
+            # 選擇策略
+            selected_strategy = self.strategy.select(
+                symbol,
+                df_1h.iloc[:i+1],
+                df_4h_until_now,
+                df_1d_until_now
+            )
+            
+            if selected_strategy == "no_trade":
+                return
+                
+            # 根據策略開倉
+            if selected_strategy.endswith("long"):
+                side = "BUY"
+            else:
+                side = "SELL"
+                
+            # 計算倉位大小
+            is_trend = selected_strategy.startswith("trend")
+            amount = self.broker.calculate_position_size(
+                current_price=current_price,
+                is_trend=is_trend,
+                df=df_1h.iloc[:i+1]
+            )
+            
+            # 開倉
+            if is_trend:
+                self.broker.open_position(
+                    symbol=symbol,
+                    side=side,
+                    amount=amount,
+                    price=current_price,
+                    timestamp=current_time,
+                    strategy=selected_strategy,
+                    stop_loss=self.broker.set_stop_loss(is_trend, current_price, side),
+                    trailing_stop=self.broker.set_trailing_activate_price(current_price, side),
+                    price_rate=self.broker.set_trailing_price_rate()
+                )
+            else:
+                self.broker.open_position(
+                    symbol=symbol,
+                    side=side,
+                    amount=amount,
+                    price=current_price,
+                    timestamp=current_time,
+                    strategy=selected_strategy,
+                    stop_loss=self.broker.set_stop_loss(is_trend, current_price, side),
+                    take_profit=self.broker.set_take_profit(current_price, side)
+                )
+            
+            # 記錄市場條件
+            self.broker.record_market_condition(symbol, current_time, df_1h.iloc[:i+1], df_4h_until_now, df_1d_until_now)
+            
+            # 檢查被動出場
+            high_price = Decimal(str(df_1h['high'].iloc[i-1]))
+            low_price = Decimal(str(df_1h['low'].iloc[i-1]))
+            
+            # 檢查止損
+            if position and position['stop_loss'] is not None:
+                if self.broker.check_stop_loss(symbol, high_price, low_price, current_time):
+                    price = position['stop_loss']
+                    self.broker.close_position(symbol, price, current_time, "STOP_LOSS")
+                    return
+                    
+            # 檢查止盈
+            if position and position['take_profit'] is not None:
+                if self.broker.check_take_profit(symbol, high_price, low_price, current_time):
+                    price = position['take_profit']
+                    self.broker.close_position(symbol, price, current_time, "TAKE_PROFIT")
+                    return
+                    
+            # 檢查移動止損
+            if position and position['trailing_stop'] is not None:
+                if self.broker.check_trailing_stop(symbol, high_price, low_price):
+                    price = position['stop_loss']
+                    self.broker.close_position(symbol, price, current_time, "TRAILING_STOP")
+                    return
+                        
+        except Exception as e:
+            logger.error(f"處理開倉邏輯失敗: {str(e)}")
             raise
     
     def generate_performance_report(self, file_name: str) -> None:
