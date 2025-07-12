@@ -86,7 +86,8 @@ class PerformanceMetrics:
         
         if not df.empty:
             # 統一新增 date 欄位
-            df['date'] = pd.to_datetime(df['open_time']).dt.date
+            local_tz = datetime.now().astimezone().tzinfo
+            df['date'] = pd.to_datetime(df['open_time'], unit='ms', utc=True).dt.tz_convert(local_tz).dt.date
             
             # 處理實盤的 market_condition（直接是 list）
             df['trend_filter'] = df['market_condition'].apply(
@@ -209,7 +210,10 @@ class PerformanceMetrics:
         profit_factor = total_profit / total_loss if total_loss != 0 else 0
         
         # 計算平均持倉時間（分鐘）
-        df['holding_time'] = (pd.to_datetime(df['close_time']) - pd.to_datetime(df['open_time'])).dt.total_seconds() / 60
+        df['holding_time'] = (
+            pd.to_datetime(df['close_time'], unit='ms', utc=True) - 
+            pd.to_datetime(df['open_time'], unit='ms', utc=True)
+        ).dt.total_seconds() / 60
         avg_holding_time = df['holding_time'].mean()
         
         # 建立總體摘要
@@ -307,7 +311,10 @@ class PerformanceMetrics:
 
         # 計算平均持倉時間
         group_copy = group.copy()
-        group_copy['holding_time'] = (pd.to_datetime(group_copy['close_time']) - pd.to_datetime(group_copy['open_time'])).dt.total_seconds() / 60
+        group_copy['holding_time'] = (
+            pd.to_datetime(group_copy['close_time'], unit='ms', utc=True) - 
+            pd.to_datetime(group_copy['open_time'], unit='ms', utc=True)
+        ).dt.total_seconds() / 60
         avg_holding_time = group_copy['holding_time'].mean()
 
         # 建立結果字典
